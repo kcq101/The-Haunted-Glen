@@ -109,7 +109,10 @@ export const STORE = { x: 752, y: 932, facing: -Math.PI * 0.75 }; // up on the e
 export const HOME_ID = 'h1018';
 export const HOUSES = [
   // North row (backs onto Snyder Ave), front doors face the street to the south
-  { id: 'h1022', x: 140, y: 468, facing: 'S' },
+  // Corner house next door: angled toward the bend in the road, white with a
+  // dark roof and a stone lower story (from the 1015 Iron Works street view)
+  { id: 'h1022', x: 146, y: 474, facing: 'SE', garage: -1,
+    style: { siding: '#f3f2ee', roof: '#3a3e43', door: '#24282b', stone: '#a8937a', stoneBand: true, frontGable: true, porch: true, chimney: false, shutters: false, W: 12.4, D: 9.6, H: 6.2 } },
   { id: HOME_ID, x: 226, y: 462, facing: 'S', home: true },
   { id: 'h1014', x: 307, y: 460, facing: 'S', garage: 1 },
   { id: 'h1010', x: 390, y: 457, facing: 'S' },
@@ -149,4 +152,4 @@ export const HOUSES = [
   { id: 'h1023', x: 288, y: 1162, facing: 'W' },
 ];
 
-export const FACING_ANGLE = { S: 0, N: Math.PI, E: Math.PI / 2, W: -Math.PI / 2, SW: -Math.PI / 4 };
+export const FACING_ANGLE = { S: 0, N: Math.PI, E: Math.PI / 2, W: -Math.PI / 2, SW: -Math.PI / 4, SE: Math.PI / 4 };

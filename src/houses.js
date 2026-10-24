@@ -53,6 +53,7 @@ export function makeHouseSpecs() {
       seed: hashString(h.id),
     };
     if (h.garage) spec.garageSide = h.garage;
+    if (h.style) Object.assign(spec, h.style);
     if (spec.home) {
       // Modeled on the street view: white siding, stone center bay with a
       // front gable, a 1.5-story wing on the right, black shutters, dark roof.
@@ -166,13 +167,15 @@ function buildOne(B, s, M) {
 
   // stone veneer (center bay for gabled fronts, lower story otherwise)
   const bayW = s.home ? 4.6 : 4.2;
+  const bayOut = !!(s.frontGable && s.stone && !s.stoneBand); // stone bay sticks out
   if (s.stone) {
-    if (s.frontGable) B.add(GEO.box, s.stone, { y: H / 2, z: D / 2 + 0.25, sx: bayW, sy: H, sz: 0.5 }, 'solid', M);
-    else B.add(GEO.box, s.stone, { y: 0.9, z: D / 2 + 0.08, sx: W + 0.02, sy: 1.8, sz: 0.18 }, 'solid', M);
+    if (s.stoneBand) B.add(GEO.box, s.stone, { y: 1.3, z: D / 2 + 0.08, sx: W + 0.04, sy: 2.6, sz: 0.18 }, 'solid', M);
+    if (s.frontGable && !s.stoneBand) B.add(GEO.box, s.stone, { y: H / 2, z: D / 2 + 0.25, sx: bayW, sy: H, sz: 0.5 }, 'solid', M);
+    else if (!s.stoneBand) B.add(GEO.box, s.stone, { y: 0.9, z: D / 2 + 0.08, sx: W + 0.02, sy: 1.8, sz: 0.18 }, 'solid', M);
   }
   // front cross gable
   if (s.frontGable) {
-    const gz = D / 2 + (s.stone ? 0.5 : 0.1);
+    const gz = D / 2 + (bayOut ? 0.5 : 0.1);
     addGableRoof(B, {
       w: 3.0, d: bayW + 0.2, h: 2.6, roofColor: s.roof, wallColor: s.stone && !s.home ? s.siding : s.siding,
       parent: M, x: 0, y: H, z: gz - 1.5, ry: Math.PI / 2,
@@ -183,7 +186,7 @@ function buildOne(B, s, M) {
   if (s.home) B.add(GEO.box, '#2e3236', { y: H / 2 + 0.25, z: D / 2 + 0.75, rx: 0.5, sx: bayW + 0.3, sy: 0.12, sz: 0.9 }, 'solid', M);
 
   // door + steps + light
-  const dz = D / 2 + (s.frontGable && s.stone ? 0.5 : 0.05);
+  const dz = D / 2 + (bayOut ? 0.5 : s.stoneBand ? 0.2 : 0.05);
   B.add(GEO.box, TRIM, { x: s.doorX, y: 1.25, z: dz + 0.02, sx: 1.7, sy: 2.6, sz: 0.1 }, 'solid', M);
   B.add(GEO.box, s.door, { x: s.doorX, y: 1.15, z: dz + 0.07, sx: 1.05, sy: 2.25, sz: 0.08 }, 'solid', M);
   B.add(GEO.box, '#ffd27a', { x: s.doorX + 0.32, y: 1.12, z: dz + 0.13, sx: 0.08, sy: 0.08, sz: 0.06 }, 'solid', M);
@@ -210,7 +213,7 @@ function buildOne(B, s, M) {
     for (const cx of cols) {
       if (Math.abs(cx - s.doorX) < 1.3 && row < 3) continue;
       const inBay = s.frontGable && Math.abs(cx) < bayW / 2;
-      addWindow(B, M, cx, row, D / 2 + (inBay && s.stone ? 0.5 : 0) + 0.02, 1.15, 1.55, { shutters: s.shutters ? s.shutterColor : null, haunted, shutterTilt: tilt() });
+      addWindow(B, M, cx, row, D / 2 + (inBay && bayOut ? 0.5 : 0) + (s.stoneBand && row < 3 ? 0.2 : 0) + 0.02, 1.15, 1.55, { shutters: s.shutters ? s.shutterColor : null, haunted, shutterTilt: tilt() });
     }
   }
   if (s.home) addWindow(B, M, 0.0, 4.4, D / 2 + 0.52, 1.05, 1.45, { shutters: s.shutterColor, haunted, shutterTilt: tilt() });
@@ -255,7 +258,7 @@ function buildOne(B, s, M) {
     const t = -W / 2 + 0.8 + (i / 5) * (W - 1.6);
     if (Math.abs(t - s.doorX) < 1.4) continue;
     const r = 0.7 + rng() * 0.35;
-    B.add(GEO.sphereLo, shrubCols[(rng() * shrubCols.length) | 0], { x: t, y: r * 0.55, z: D / 2 + 0.95 + (s.frontGable && s.stone && Math.abs(t) < bayW / 2 ? 0.5 : 0), sx: r * 1.6, sy: r * 1.2, sz: r * 1.3 }, 'solid', M);
+    B.add(GEO.sphereLo, shrubCols[(rng() * shrubCols.length) | 0], { x: t, y: r * 0.55, z: D / 2 + 0.95 + (bayOut && Math.abs(t) < bayW / 2 ? 0.5 : 0), sx: r * 1.6, sy: r * 1.2, sz: r * 1.3 }, 'solid', M);
   }
 }
 
