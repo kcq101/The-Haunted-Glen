@@ -15,12 +15,12 @@ Open the GitHub Pages link on the tablet, then **Share → Add to Home Screen** 
 | Orange button | Knock, enter, go shopping, BOO! |
 | Purple button | Jump |
 | Kid button (top right) | Switch between Carter and Jack (the other brother follows along) |
-| 🌙 / ☀️ | Jump to night or back to golden hour |
+| 🌅 ☀️ 🌇 🌙 | Skip ahead: morning → noon → golden hour → night |
 
 Keyboard also works: WASD/arrows to walk, Q/E to turn, Space to jump, Enter to use the orange button.
 
 ### The loop
-- **Trick-or-treat:** every glowing door gives 2–4 candy once per night. A full golden hour → night → golden hour cycle takes 10 minutes; each new night the doors glow again.
+- **Trick-or-treat:** every glowing door gives 2–4 candy once per night. A full day (morning, noon, golden hour, night) takes 12 minutes; each time night falls the doors glow again.
 - **Hares Hill Halloween Emporium:** past the cul-de-sac, follow the lanterns over the footbridge. Hazel the hare sells hats, faces, outfits and props (pirate, firefighter, monsters, space and superhero). Try anything on for free; buy with candy.
 - **The haunted house:** the front door of 1018 opens into a 2D, Stardew-style house that is much bigger inside than out (library, great hall, portrait hall, spooky kitchen, Carter's and Jack's rooms, the toy room…). Ghosts hide in closets and the piano and pop out. Tap BOO! to scare them back for candy. Find the 8 golden candy corns for prizes: Skull Mask (3), Pumpkin Head (6), Ghost Sheet (8).
 
@@ -31,6 +31,7 @@ Progress (candy, costumes, candy corns) saves on the device.
 ```
 index.html            page + UI
 css/style.css         UI styling
+data/elevation.json   real ground heights (from tools/build_elevation.py)
 src/config.js         map layout (roads, houses, woods, trail, store) and the boys' looks
 src/terrain.js        ground shape and painted ground (roads, sidewalks, creek, trail)
 src/houses.js         house builder (home is modeled on the street view)
@@ -53,7 +54,10 @@ Everything on the map is placed using pixel positions from the aerial screenshot
 - **Meshy models:** drop rigged models at `assets/models/carter.glb` and `assets/models/jack.glb`. The loader and costume anchor hookup is the next step.
 - **GPT sprites for the haunted house:** pixel tiles at 16 px (32 px also fine). They'll replace the draw functions in `src/haunted2d.js`.
 - **Theme music:** put an mp3 at `assets/music/theme.mp3`, and it plays automatically on a loop.
-- **Real elevation:** the hills are hand-shaped approximations right now (the house sits up on a bank above the street, the east woods drop to a creek). USGS LiDAR elevations can replace them once the elevation service is reachable from the build environment.
+
+## Elevation
+
+The ground uses real heights from the USGS 3DEP 1 m LiDAR (sampled every 8 m around the cul-de-sac and stored in `tools/lidar_grid_8m.json`). `python3 tools/build_elevation.py` turns that into `data/elevation.json`. The LiDAR was flown before the houses went in, so the game adds back the graded bank the north-side houses sit on, and the creek and the store's trail follow the real valley in the east woods. Slopes are scaled to 90% to stay gentle.
 
 ## Running locally
 

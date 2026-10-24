@@ -15,10 +15,10 @@ export function px(x, y) {
 }
 
 // World bounds the players can walk inside (aerial pixels).
-export const BOUNDS = { minX: 20, maxX: 745, minY: 392, maxY: 1285 };
+export const BOUNDS = { minX: 20, maxX: 795, minY: 392, maxY: 1285 };
 
-// Day/night: one full golden hour -> night -> golden hour loop, in seconds.
-export const DAY_CYCLE_SECONDS = 600;
+// Day/night: one full morning -> noon -> golden hour -> night loop, in seconds.
+export const DAY_CYCLE_SECONDS = 720;
 
 // --- Characters -----------------------------------------------------------
 // Tweak these to make the boys look like themselves until the Meshy models
@@ -96,12 +96,13 @@ export const WOODS = [
   [[-80, 250], [830, 200], [830, 270], [600, 330], [400, 352], [150, 350], [-80, 342]],
 ];
 
-// Little creek in the east woods; the trail crosses it on a footbridge.
-export const CREEK = [[560, 600], [592, 690], [622, 780], [612, 880], [590, 980], [560, 1090], [515, 1260]];
+// Creek following the real valley in the east woods (from the LiDAR); the
+// trail crosses it on a footbridge.
+export const CREEK = [[805, 575], [763, 605], [738, 670], [722, 730], [710, 800], [703, 870], [701, 950], [688, 1012], [668, 1075], [662, 1180], [645, 1262]];
 
 // Trail from the cul-de-sac to the Hares Hill Halloween Emporium
-export const TRAIL = [[714, 556], [724, 605], [700, 680], [655, 745], [625, 785], [640, 835], [662, 880], [668, 915]];
-export const STORE = { x: 668, y: 945, facing: Math.PI }; // door faces north toward the trail
+export const TRAIL = [[714, 556], [708, 615], [694, 690], [682, 770], [684, 840], [700, 880], [720, 900], [733, 912]];
+export const STORE = { x: 752, y: 932, facing: -Math.PI * 0.75 }; // up on the east bank, door faces the trail
 
 // --- Houses ----------------------------------------------------------------
 // facing: direction the front door faces. 'S' = toward the bottom of the map.

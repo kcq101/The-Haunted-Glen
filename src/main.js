@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { CHARACTERS, BOUNDS, px, HOME_ID } from './config.js';
-import { createTerrain, storePos } from './terrain.js';
+import { CHARACTERS, BOUNDS, px, HOME_ID, STORE } from './config.js';
+import { createTerrain, storePos, setElevation } from './terrain.js';
 import { makeHouseSpecs, groundMarks, buildHouses } from './houses.js';
 import { Builder } from './builder.js';
 import { createTrees, createFallingLeaves } from './nature.js';
 import { GlowField } from './glow.js';
-import { DayNight } from './sky.js';
+import { DayNight, NIGHT_START } from './sky.js';
 import { decorateNeighborhood, addStreetLamps, addTrail, hauntHome, addBoundaryFence } from './decor.js';
 import { buildStoreExterior, buildStoreInterior, HAZEL_LINES } from './store.js';
 import { Kid } from './character.js';
@@ -67,7 +67,8 @@ const mats = {
 function buildWorld() {
   const specs = makeHouseSpecs();
   const marks = groundMarks(specs);
-  const terrain = createTerrain(specs.map((s) => s.pad), marks.driveways, marks.walkways);
+  const storePad = { x: storePos.x, z: storePos.z, rot: STORE.facing, hw: 7.5, hd: 8.5 };
+  const terrain = createTerrain([...specs.map((s) => s.pad), storePad], marks.driveways, marks.walkways);
   scene.add(terrain.mesh);
   W.heightAt = terrain.heightAt;
   W.specs = specs;
@@ -414,10 +415,10 @@ function leaveShop() {
     $('shop').classList.add('hidden');
     $('hud').classList.remove('hidden');
     const d = W.store.door;
-    player.x = d.x; player.z = d.z - 1.5;
-    player.yaw = Math.PI;
+    player.x = d.x + Math.sin(STORE.facing) * 1.5; player.z = d.z + Math.cos(STORE.facing) * 1.5;
+    player.yaw = STORE.facing;
     follower.x = player.x + 1.2; follower.z = player.z - 0.6;
-    cam.yaw = 0;
+    cam.yaw = STORE.facing + Math.PI;
     cam.snap = true;
   });
 }
@@ -554,7 +555,7 @@ controls.onJump = () => { if (mode === 'world') { kids[current].jump(); sfx.jump
 $('btn-action').addEventListener('click', () => doAction());
 $('btn-jump').addEventListener('click', () => controls.onJump());
 $('btn-swap').addEventListener('click', () => swapKid());
-$('btn-time').addEventListener('click', () => { initAudio(); sky.toggle(); sfx.click(); });
+$('btn-time').addEventListener('click', () => { initAudio(); const ph = sky.next(); sfx.click(); toast(`${ph.icon} ${ph.label}`, 1.6); });
 $('btn-sound').addEventListener('click', () => {
   initAudio();
   setMuted(!isMuted());
@@ -669,7 +670,7 @@ function updateWorld(dt) {
   // day / night
   const prevT = sky.t;
   sky.update(dt, tmpV.set(player.x, player.y, player.z));
-  if (sky.t < prevT - 0.5) { save.nightNumber++; writeSave(save); refreshDoorGlows(); toast('A new Halloween night! The doors are glowing again. 🎃'); }
+  if (prevT < NIGHT_START && sky.t >= NIGHT_START && sky.t < NIGHT_START + 0.2) { save.nightNumber++; writeSave(save); refreshDoorGlows(); toast('Halloween night is here! The doors are glowing again. 🎃'); }
   const n = sky.night;
   mats.window.color.copy(dayWin).lerp(nightWin, n);
   mats.lamp.color.copy(dayLamp).lerp(nightLamp, n);
@@ -677,7 +678,7 @@ function updateWorld(dt) {
   glows.update(n, time, renderer.domElement.height);
   kidLight.intensity = n * 9;
   kidLight.position.set(player.x, player.y + 3.2, player.z + 0.5);
-  $('btn-time').textContent = n > 0.5 ? '☀️' : '🌙';
+  $('btn-time').textContent = sky.phase().icon;
   W.haunt.update(dt, time, n);
   W.leaves.update(dt, player, W.heightAt, time);
   updateAmbient(dt, n, false);
@@ -772,7 +773,11 @@ function frame(now) {
 // ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
-requestAnimationFrame(() => setTimeout(() => {
+requestAnimationFrame(() => setTimeout(async () => {
+  try {
+    const r = await fetch('data/elevation.json');
+    if (r.ok) setElevation(await r.json());
+  } catch (e) { /* fall back to the hand-shaped hills */ }
   const t0 = performance.now();
   buildWorld();
   placeAtHome();

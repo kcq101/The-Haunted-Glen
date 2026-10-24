@@ -18,13 +18,45 @@ export const storePos = px(STORE.x, STORE.y);
 
 const northRoadZ = px(0, 525).z;
 const ourHollow = px(176, 488);
-const haresHill = px(684, 975);
+const haresHill = px(760, 940);
 
 // "Natural" ground before roads and yards are leveled. This is an artistic
 // approximation of the real slopes: houses on the north side sit up on a bank
 // above the street, the east woods drop into a creek valley, and Hares Hill
 // rises on the far side of the creek.
+// Real ground heights from USGS 3DEP LiDAR (1 m), resampled to game units by
+// tools/build_elevation.py. Loaded before the world is built.
+let ELEV = null;
+export function setElevation(data) {
+  if (!data || !data.heights) return;
+  ELEV = { ...data, h: Float32Array.from(data.heights) };
+}
+function lidar(x, z) {
+  const E = ELEV;
+  const fx = Math.max(0, Math.min(E.cols - 1.001, (x - E.x0) / E.step));
+  const fz = Math.max(0, Math.min(E.rows - 1.001, (z - E.z0) / E.step));
+  const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
+  const a = E.h[j * E.cols + i], b = E.h[j * E.cols + i + 1], c = E.h[(j + 1) * E.cols + i], d = E.h[(j + 1) * E.cols + i + 1];
+  return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+}
+
 function natural(x, z) {
+  if (ELEV) {
+    // real elevation, plus a little channel so the creek reads as a creek
+    let h = lidar(x, z);
+    // the north-side yards were graded up into a bank above the street
+    // (see the street view); the LiDAR predates the houses, so add it back
+    const bank = smoothstep(northRoadZ - 4.5, northRoadZ - 12, z) * (1 - smoothstep(px(0, 360).z, px(0, 330).z, z));
+    h += bank * 1.9 * smoothstep(px(60, 0).x, px(110, 0).x, x) * (1 - smoothstep(px(690, 0).x, px(740, 0).x, x));
+    const dh = Math.hypot(x - ourHollow.x, z - ourHollow.z);
+    h -= 0.9 * Math.exp(-((dh / 9) ** 2));
+    // a little channel so the creek reads as a creek, and a gentle knoll for Hares Hill
+    const c = polylineDistance(x, z, creekLine).d;
+    h -= 0.9 * (1 - smoothstep(0.8, 3.2, c));
+    const dhh = Math.hypot(x - haresHill.x, z - haresHill.z);
+    h += 1.6 * Math.exp(-((dhh / 14) ** 2));
+    return h;
+  }
   let h = 0;
   h += (fbm(x * 0.012 + 3.1, z * 0.012 + 7.7, 4) - 0.5) * 6.0; // rolling ground
   h += -x * 0.02 - z * 0.008; // overall fall toward the southeast

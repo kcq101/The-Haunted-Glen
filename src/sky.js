@@ -2,18 +2,30 @@ import * as THREE from 'three';
 import { DAY_CYCLE_SECONDS } from './config.js';
 import { clamp } from './util.js';
 
-// Golden hour -> sunset -> night -> dawn -> golden hour.
+// Morning -> noon -> afternoon -> golden hour -> sunset -> night -> dawn.
+// az = sun direction around the horizon (0 = east, -90 = south, -180 = west).
 const KEYS = [
-  { t: 0.0, elev: 11, top: '#6c93d6', hor: '#f7c98a', sun: '#ffbd6e', sunI: 2.6, hemS: '#c4d6f2', hemG: '#80684a', hemI: 1.0, fog: '#ecd2ae', night: 0 },
-  { t: 0.24, elev: 6, top: '#5a7fc8', hor: '#f8a965', sun: '#ffa04e', sunI: 2.3, hemS: '#c0c8e6', hemG: '#7a5c40', hemI: 0.9, fog: '#e7b48c', night: 0 },
-  { t: 0.34, elev: 0, top: '#40589e', hor: '#ec7d50', sun: '#ff6e3c', sunI: 1.2, hemS: '#9c9cc8', hemG: '#5e4234', hemI: 0.7, fog: '#bd7f70', night: 0.25 },
-  { t: 0.42, elev: -7, top: '#1d2556', hor: '#5d4478', sun: '#8fa3ff', sunI: 0.45, hemS: '#4f5a94', hemG: '#2a2230', hemI: 0.55, fog: '#3a3658', night: 0.85 },
-  { t: 0.5, elev: -12, top: '#0a0f2e', hor: '#262650', sun: '#8aa2ff', sunI: 0.75, hemS: '#4a5a9e', hemG: '#262030', hemI: 0.8, fog: '#1a1c38', night: 1 },
-  { t: 0.78, elev: -12, top: '#0a0f2e', hor: '#262650', sun: '#8aa2ff', sunI: 0.75, hemS: '#4a5a9e', hemG: '#262030', hemI: 0.8, fog: '#1a1c38', night: 1 },
-  { t: 0.86, elev: -5, top: '#28386e', hor: '#7c5a8c', sun: '#ff8a60', sunI: 0.6, hemS: '#6c6ca8', hemG: '#3a2c30', hemI: 0.65, fog: '#5c4c6c', night: 0.6 },
-  { t: 0.94, elev: 4, top: '#5577c0', hor: '#f4a068', sun: '#ffa458', sunI: 2.0, hemS: '#b8c0e0', hemG: '#76583e', hemI: 0.85, fog: '#e0aa88', night: 0.08 },
-  { t: 1.0, elev: 11, top: '#6c93d6', hor: '#f7c98a', sun: '#ffbd6e', sunI: 2.6, hemS: '#c4d6f2', hemG: '#80684a', hemI: 1.0, fog: '#ecd2ae', night: 0 },
+  { t: 0.0, elev: 14, az: -20, top: '#7fb0e6', hor: '#f3e0c6', sun: '#ffe2b0', sunI: 2.4, hemS: '#cfe0f5', hemG: '#7d6a4c', hemI: 1.0, fog: '#e9e2d4', night: 0 },
+  { t: 0.12, elev: 32, az: -45, top: '#5f9ee8', hor: '#d9e8f2', sun: '#fff1d6', sunI: 2.8, hemS: '#d6e6fa', hemG: '#7a6e52', hemI: 1.1, fog: '#d9e4ec', night: 0 },
+  { t: 0.24, elev: 55, az: -90, top: '#4d92ea', hor: '#cfe3f3', sun: '#ffffff', sunI: 3.0, hemS: '#dbe9fb', hemG: '#7f7458', hemI: 1.15, fog: '#d5e3ee', night: 0 },
+  { t: 0.35, elev: 30, az: -105, top: '#5a8fd8', hor: '#e8dcc0', sun: '#fff0cf', sunI: 2.7, hemS: '#d2def2', hemG: '#7d6c50', hemI: 1.05, fog: '#e2dccb', night: 0 },
+  { t: 0.45, elev: 11, az: -115, top: '#6c93d6', hor: '#f7c98a', sun: '#ffbd6e', sunI: 2.6, hemS: '#c4d6f2', hemG: '#80684a', hemI: 1.0, fog: '#ecd2ae', night: 0 },
+  { t: 0.56, elev: 6, az: -120, top: '#5a7fc8', hor: '#f8a965', sun: '#ffa04e', sunI: 2.3, hemS: '#c0c8e6', hemG: '#7a5c40', hemI: 0.9, fog: '#e7b48c', night: 0 },
+  { t: 0.62, elev: 0, az: -125, top: '#40589e', hor: '#ec7d50', sun: '#ff6e3c', sunI: 1.2, hemS: '#9c9cc8', hemG: '#5e4234', hemI: 0.7, fog: '#bd7f70', night: 0.25 },
+  { t: 0.67, elev: -7, az: -130, top: '#1d2556', hor: '#5d4478', sun: '#8fa3ff', sunI: 0.45, hemS: '#4f5a94', hemG: '#2a2230', hemI: 0.55, fog: '#3a3658', night: 0.85 },
+  { t: 0.71, elev: -12, az: -130, top: '#0a0f2e', hor: '#262650', sun: '#8aa2ff', sunI: 0.75, hemS: '#4a5a9e', hemG: '#262030', hemI: 0.8, fog: '#1a1c38', night: 1 },
+  { t: 0.9, elev: -12, az: 10, top: '#0a0f2e', hor: '#262650', sun: '#8aa2ff', sunI: 0.75, hemS: '#4a5a9e', hemG: '#262030', hemI: 0.8, fog: '#1a1c38', night: 1 },
+  { t: 0.955, elev: -4, az: -5, top: '#33467e', hor: '#e8957a', sun: '#ff9a6a', sunI: 0.8, hemS: '#7a7cb0', hemG: '#3e3032', hemI: 0.7, fog: '#8a7088', night: 0.5 },
+  { t: 1.0, elev: 14, az: -20, top: '#7fb0e6', hor: '#f3e0c6', sun: '#ffe2b0', sunI: 2.4, hemS: '#cfe0f5', hemG: '#7d6a4c', hemI: 1.0, fog: '#e9e2d4', night: 0 },
 ];
+// Times the sun/moon button jumps between
+export const PHASES = [
+  { id: 'morning', label: 'Morning', icon: '🌅', t: 0.02 },
+  { id: 'noon', label: 'Noon', icon: '☀️', t: 0.24 },
+  { id: 'golden', label: 'Golden hour', icon: '🌇', t: 0.46 },
+  { id: 'night', label: 'Night', icon: '🌙', t: 0.75 },
+];
+export const NIGHT_START = 0.67;
 KEYS.forEach((k) => {
   for (const f of ['top', 'hor', 'sun', 'hemS', 'hemG', 'fog']) k[f] = new THREE.Color(k[f]);
 });
@@ -21,7 +33,7 @@ KEYS.forEach((k) => {
 export class DayNight {
   constructor(scene) {
     this.scene = scene;
-    this.t = 0.02; // start in golden hour
+    this.t = 0.46; // start in golden hour
     this.state = {};
     this.night = 0;
 
@@ -107,10 +119,21 @@ export class DayNight {
     this.moonDir = new THREE.Vector3(0.45, 0.7, 0.55).normalize();
   }
 
-  // Jump to golden hour or night (the sun/moon button).
-  toggle() {
-    if (this.night > 0.5) this.t = 0.95;
-    else this.t = 0.46;
+  // Which part of the day it is now
+  phase() {
+    const t = this.t;
+    if (t >= NIGHT_START && t < 0.94) return PHASES[3];
+    if (t >= 0.4 && t < NIGHT_START) return PHASES[2];
+    if (t >= 0.17 && t < 0.4) return PHASES[1];
+    return PHASES[0];
+  }
+
+  // The time button: jump ahead to the next part of the day
+  next() {
+    const i = PHASES.indexOf(this.phase());
+    const n = PHASES[(i + 1) % PHASES.length];
+    this.t = n.t;
+    return n;
   }
 
   update(dt, center) {
@@ -125,11 +148,11 @@ export class DayNight {
       s[f] = s[f] || new THREE.Color();
       s[f].copy(a[f]).lerp(b[f], k);
     }
-    for (const f of ['elev', 'sunI', 'hemI', 'night']) s[f] = a[f] + (b[f] - a[f]) * k;
+    for (const f of ['elev', 'az', 'sunI', 'hemI', 'night']) s[f] = a[f] + (b[f] - a[f]) * k;
     this.night = s.night;
 
     const el = THREE.MathUtils.degToRad(s.elev);
-    const az = THREE.MathUtils.degToRad(-115); // sun sets toward the west-southwest
+    const az = THREE.MathUtils.degToRad(s.az);
     this.sunDir.set(Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az) * -1).normalize();
     const lightDir = this.sunDir.clone();
     if (s.elev < 2) lightDir.lerp(this.moonDir, clamp((2 - s.elev) / 8, 0, 1)).normalize();
