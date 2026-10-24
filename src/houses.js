@@ -199,8 +199,15 @@ function buildOne(B, s, M) {
   B.add(GEO.box, '#ffd27a', { x: s.doorX + 0.32, y: 1.12, z: dz + 0.13, sx: 0.08, sy: 0.08, sz: 0.06 }, 'solid', M);
   // sidelights
   for (const side of [-1, 1]) B.add(GEO.box, '#ffffff', { x: s.doorX + side * 0.68, y: 1.25, z: dz + 0.06, sx: 0.22, sy: 1.9, sz: 0.04 }, 'window', M);
-  B.add(GEO.box, '#bdb8ae', { x: s.doorX, y: 0.12, z: dz + 0.7, sx: 2.2, sy: 0.3, sz: 1.3 }, 'solid', M);
-  B.add(GEO.box, '#bdb8ae', { x: s.doorX, y: -0.05, z: dz + 1.4, sx: 2.0, sy: 0.25, sz: 0.9 }, 'solid', M);
+  // front steps go all the way down into the ground, and are walkable
+  s.steps = [];
+  const step = (z, d, w, top) => {
+    B.add(GEO.box, '#bdb8ae', { x: s.doorX, y: (top - 1.6) / 2, z, sx: w, sy: top + 1.6, sz: d }, 'solid', M);
+    s.steps.push({ x: s.doorX, z, hw: w / 2, hd: d / 2, top });
+  };
+  step(dz + 0.7, 1.3, 2.2, 0.27);
+  step(dz + 1.75, 0.8, 2.0, 0.09);
+  step(dz + 2.5, 0.7, 1.8, -0.09);
   // little canopy over the door
   if (!s.porch) B.add(GEO.box, s.home ? '#2e3236' : s.roof, { x: s.doorX, y: 2.75, z: dz + 0.55, rx: 0.35, sx: 2.2, sy: 0.12, sz: 1.2 }, 'solid', M);
   // porch lights
@@ -209,7 +216,8 @@ function buildOne(B, s, M) {
   // full front porch
   if (s.porch) {
     const pw = W * 0.7;
-    B.add(GEO.box, '#bdb8ae', { x: 0, y: 0.2, z: D / 2 + 1.3, sx: pw, sy: 0.4, sz: 2.6 }, 'solid', M);
+    B.add(GEO.box, '#bdb8ae', { x: 0, y: (0.4 - 1.6) / 2, z: D / 2 + 1.3, sx: pw, sy: 2.0, sz: 2.6 }, 'solid', M);
+    s.steps.push({ x: 0, z: D / 2 + 1.3, hw: pw / 2, hd: 1.3, top: 0.4 });
     for (const t of [-0.5, -0.17, 0.17, 0.5]) B.add(GEO.box, TRIM, { x: t * pw, y: 1.6, z: D / 2 + 2.4, sx: 0.22, sy: 2.6, sz: 0.22 }, 'solid', M);
     B.add(GEO.box, s.roof, { x: 0, y: 3.05, z: D / 2 + 1.5, rx: 0.22, sx: pw + 0.5, sy: 0.16, sz: 3.2 }, 'solid', M);
   }

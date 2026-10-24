@@ -75,6 +75,14 @@ function buildWorld() {
 
   const B = new Builder();
   W.colliders = buildHouses(B, specs, terrain.heightAt);
+  // walkable step/porch tops in world space
+  W.steps = [];
+  for (const s of specs) {
+    for (const st of s.steps || []) {
+      const c = Math.cos(s.rot), sn = Math.sin(s.rot);
+      W.steps.push({ cx: s.x + st.x * c + st.z * sn, cz: s.z - st.x * sn + st.z * c, rot: s.rot, hw: st.hw, hd: st.hd, top: s.y + st.top, r: Math.hypot(st.hw, st.hd) + 0.3 });
+    }
+  }
   decorateNeighborhood(B, glows, specs, terrain.heightAt);
   addStreetLamps(B, glows, terrain.heightAt);
   addBoundaryFence(B, terrain.heightAt);
@@ -169,6 +177,14 @@ function pushOut(p) {
 
 function groundY(x, z) {
   let y = W.heightAt(x, z);
+  // front steps and porches
+  for (const st of W.steps) {
+    if (Math.abs(x - st.cx) > st.r || Math.abs(z - st.cz) > st.r) continue;
+    const dx = x - st.cx, dz = z - st.cz;
+    const lx = dx * Math.cos(st.rot) - dz * Math.sin(st.rot);
+    const lz = dx * Math.sin(st.rot) + dz * Math.cos(st.rot);
+    if (Math.abs(lx) <= st.hw + 0.15 && Math.abs(lz) <= st.hd + 0.15) y = Math.max(y, st.top);
+  }
   const br = W.bridge;
   if (br) {
     const dx = x - br.x, dz = z - br.z;
