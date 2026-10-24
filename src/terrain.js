@@ -76,6 +76,23 @@ function natural(x, z) {
   return h;
 }
 
+// Curbs: sidewalks and lawns sit about 4.5" above the asphalt.
+export const CURB = 0.115;
+
+// Is this spot on the asphalt (any road or the cul-de-sac ring)?
+export function onRoad(x, z) {
+  const dc = Math.hypot(x - culDeSac.x, z - culDeSac.z);
+  if (dc <= culDeSac.r && dc >= culDeSac.island) return true;
+  for (const r of roadLines) if (polylineDistance(x, z, r.line).d <= r.width / 2) return true;
+  return false;
+}
+function nearRoadEdge(x, z, margin) {
+  const dc = Math.hypot(x - culDeSac.x, z - culDeSac.z);
+  if (dc <= culDeSac.r + margin && dc >= culDeSac.island - margin) return true;
+  for (const r of roadLines) if (polylineDistance(x, z, r.line).d <= r.width / 2 + margin) return true;
+  return false;
+}
+
 export function createTerrain(pads, driveways, walkways) {
   const cols = Math.ceil((X1 - X0) / STEP) + 1;
   const rows = Math.ceil((Z1 - Z0) / STEP) + 1;
@@ -93,15 +110,18 @@ export function createTerrain(pads, driveways, walkways) {
     const dc = Math.hypot(x - culDeSac.x, z - culDeSac.z);
     const wc = 1 - smoothstep(culDeSac.r + 2, culDeSac.r + 6, dc);
     if (wc > 0) h = lerp(h, natural(culDeSac.x, culDeSac.z), wc);
-    // House pads
+    // House pads: blend overlapping lots together instead of letting the
+    // last one win (that used to bury the edge of a neighbor's house)
+    let wMax = 0, sw = 0, sh = 0;
     for (const p of pads) {
       const dx = x - p.x, dz = z - p.z;
       const lx = Math.abs(dx * Math.cos(p.rot) - dz * Math.sin(p.rot));
       const lz = Math.abs(dx * Math.sin(p.rot) + dz * Math.cos(p.rot));
       const d = Math.max(lx - p.hw, lz - p.hd, 0);
       const w = 1 - smoothstep(0.5, 5, d);
-      if (w > 0) h = lerp(h, p.h, w);
+      if (w > 0) { wMax = Math.max(wMax, w); sw += w; sh += w * p.h; }
     }
+    if (wMax > 0) h = lerp(h, sh / sw, wMax);
     // Trail is gently leveled across its width
     const t = polylineDistance(x, z, trailLine);
     const wt = 1 - smoothstep(1.2, 3.5, t.d);
@@ -118,26 +138,37 @@ export function createTerrain(pads, driveways, walkways) {
     }
   }
 
-  const heightAt = (x, z) => {
+  const sampleGrid = (arr, x, z) => {
     const fx = (x - X0) / STEP, fz = (z - Z0) / STEP;
     const i = Math.max(0, Math.min(cols - 2, Math.floor(fx)));
     const j = Math.max(0, Math.min(rows - 2, Math.floor(fz)));
     const u = Math.min(1, Math.max(0, fx - i)), v = Math.min(1, Math.max(0, fz - j));
-    const a = heights[j * cols + i], b = heights[j * cols + i + 1];
-    const c = heights[(j + 1) * cols + i], d = heights[(j + 1) * cols + i + 1];
-    // match the triangle split used by the mesh
+    const a = arr[j * cols + i], b = arr[j * cols + i + 1];
+    const c = arr[(j + 1) * cols + i], d = arr[(j + 1) * cols + i + 1];
     if (u + v <= 1) return a + (b - a) * u + (c - a) * v;
     return d + (c - d) * (1 - u) + (b - d) * (1 - v);
   };
+  // Street level everywhere (smooth), then lawns/sidewalks step up by a curb
+  const baseAt = (x, z) => sampleGrid(heights, x, z);
+  const heightAt = (x, z) => baseAt(x, z) + (onRoad(x, z) ? 0 : CURB);
 
-  // --- mesh ---
+  // The big ground mesh: raised by the curb height, and tucked down out of
+  // sight under the asphalt (the sharp curb edges are a separate mesh)
+  const shown = new Float32Array(heights.length);
+  for (let j = 0; j < rows; j++) {
+    for (let i = 0; i < cols; i++) {
+      const k = j * cols + i, x = X0 + i * STEP, z = Z0 + j * STEP;
+      shown[k] = heights[k] + (nearRoadEdge(x, z, 1.7) ? -0.3 : CURB);
+    }
+  }
+
   const pos = new Float32Array(cols * rows * 3);
   const uv = new Float32Array(cols * rows * 2);
   for (let j = 0; j < rows; j++) {
     for (let i = 0; i < cols; i++) {
       const k = j * cols + i;
       const x = X0 + i * STEP, z = Z0 + j * STEP;
-      pos[k * 3] = x; pos[k * 3 + 1] = heights[k]; pos[k * 3 + 2] = z;
+      pos[k * 3] = x; pos[k * 3 + 1] = shown[k]; pos[k * 3 + 2] = z;
       uv[k * 2] = (x - X0) / (X1 - X0);
       uv[k * 2 + 1] = 1 - (z - Z0) / (Z1 - Z0);
     }
@@ -165,10 +196,90 @@ export function createTerrain(pads, driveways, walkways) {
       .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform sampler2D detailMap;')
       .replace('#include <map_fragment>', '#include <map_fragment>\n diffuseColor.rgb *= texture2D(detailMap, vMapUv * vec2(150.0, 205.0)).rgb * 1.9;');
   };
+  const group = new THREE.Group();
+  group.name = 'terrain';
   const mesh = new THREE.Mesh(geo, mat);
   mesh.receiveShadow = true;
-  mesh.name = 'terrain';
-  return { mesh, heightAt };
+  group.add(mesh);
+  const street = buildStreetMesh(heightAt, mat);
+  street.receiveShadow = true;
+  group.add(street);
+  return { mesh: group, heightAt };
+}
+
+// High-detail strips along every road (and the cul-de-sac) with a crisp curb
+// step, painted with the same ground texture so they blend into the lawns.
+function buildStreetMesh(heightAt, mat) {
+  const pos = [], uv = [], index = [];
+  const push = (x, z) => {
+    pos.push(x, heightAt(x, z), z);
+    uv.push((x - X0) / (X1 - X0), 1 - (z - Z0) / (Z1 - Z0));
+    return pos.length / 3 - 1;
+  };
+  const strip = (rowsPts) => {
+    // rowsPts: array of rows, each an array of [x, z]; stitch into quads
+    const ids = rowsPts.map((row) => row.map(([x, z]) => push(x, z)));
+    for (let j = 0; j < ids.length - 1; j++) {
+      for (let i = 0; i < ids[j].length - 1; i++) {
+        const a = ids[j][i], b = ids[j][i + 1], c = ids[j + 1][i], d = ids[j + 1][i + 1];
+        index.push(a, b, c, b, d, c);
+      }
+    }
+  };
+  const E = 3.6;
+  for (const r of roadLines) {
+    const h = r.width / 2;
+    const offs = [-(h + E), -(h + 2.2), -(h + 1.0), -(h + 0.35), -(h + 0.08), -h, -(h - 0.25), -(h - 1.2)];
+    for (let x = -(h - 2.4); x < h - 2.0; x += 1.6) offs.push(x);
+    offs.push(h - 1.2, h - 0.25, h, h + 0.08, h + 0.35, h + 1.0, h + 2.2, h + E);
+    offs.sort((a, b) => a - b);
+    const line = resampleLine(r.line, 0.9);
+    const rowsPts = line.map((p, i) => {
+      const q = line[Math.min(i + 1, line.length - 1)], o = line[Math.max(i - 1, 0)];
+      const dx = q.x - o.x, dz = q.z - o.z, L = Math.hypot(dx, dz) || 1;
+      const nx = -dz / L, nz = dx / L;
+      return offs.map((t) => [p.x + nx * t, p.z + nz * t]);
+    });
+    strip(rowsPts);
+  }
+  // cul-de-sac: rings from the island out past the curb
+  const radii = [0.1, culDeSac.island - 1.2, culDeSac.island - 0.35, culDeSac.island - 0.08, culDeSac.island, culDeSac.island + 0.25, culDeSac.island + 1.2];
+  for (let rr = culDeSac.island + 2.6; rr < culDeSac.r - 1.5; rr += 1.6) radii.push(rr);
+  radii.push(culDeSac.r - 1.2, culDeSac.r - 0.25, culDeSac.r, culDeSac.r + 0.08, culDeSac.r + 0.35, culDeSac.r + 1.0, culDeSac.r + 2.2, culDeSac.r + E);
+  const segs = 72;
+  const rings = radii.map((rr) => {
+    const row = [];
+    for (let k = 0; k <= segs; k++) {
+      const a = (k / segs) * Math.PI * 2;
+      row.push([culDeSac.x + Math.cos(a) * rr, culDeSac.z + Math.sin(a) * rr]);
+    }
+    return row;
+  });
+  strip(rings);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(index);
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, mat);
+  // draw slightly in front of the lawn where they overlap at the outer edge
+  mesh.renderOrder = 1;
+  return mesh;
+}
+
+function resampleLine(line, step) {
+  const out = [line[0]];
+  let carry = 0;
+  for (let i = 0; i < line.length - 1; i++) {
+    const a = line[i], b = line[i + 1];
+    const len = Math.hypot(b.x - a.x, b.z - a.z);
+    let d = step - carry;
+    while (d <= len) { out.push({ x: a.x + ((b.x - a.x) * d) / len, z: a.z + ((b.z - a.z) * d) / len }); d += step; }
+    carry = len - (d - step);
+  }
+  out.push(line[line.length - 1]);
+  return out;
 }
 
 // ---------------------------------------------------------------------------

@@ -115,7 +115,14 @@ export function groundMarks(specs) {
 export function buildHouses(B, specs, heightAt) {
   const colliders = [];
   for (const s of specs) {
-    const y = s.pad.h ?? heightAt(s.x, s.z);
+    // sit the house on the highest ground under its footprint so no corner is buried
+    let y = -Infinity;
+    for (const [cx, cw, cd] of [[0, s.W, s.D], [s.gx, s.gw, s.gd]]) {
+      for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) {
+        const p = toWorld(s, cx + (i / 4 - 0.5) * cw, (j / 4 - 0.5) * cd + (cx ? s.gz : 0));
+        y = Math.max(y, heightAt(p.x, p.z));
+      }
+    }
     s.y = y;
     const M = new THREE.Matrix4().compose(
       new THREE.Vector3(s.x, y, s.z),
@@ -156,8 +163,8 @@ function buildOne(B, s, M) {
   const tilt = () => (haunted ? (rng() - 0.5) * 0.35 : 0);
 
   // foundation hides small slopes
-  B.add(GEO.box, '#8c877d', { y: -0.6, sx: W + 0.3, sy: 1.6, sz: D + 0.3 }, 'solid', M);
-  B.add(GEO.box, '#8c877d', { x: s.gx, y: -0.6, z: s.gz, sx: s.gw + 0.3, sy: 1.6, sz: s.gd + 0.3 }, 'solid', M);
+  B.add(GEO.box, '#8c877d', { y: -1.4, sx: W + 0.3, sy: 3.2, sz: D + 0.3 }, 'solid', M);
+  B.add(GEO.box, '#8c877d', { x: s.gx, y: -1.4, z: s.gz, sx: s.gw + 0.3, sy: 3.2, sz: s.gd + 0.3 }, 'solid', M);
 
   // main body
   B.add(GEO.box, s.siding, { y: H / 2, sx: W, sy: H, sz: D }, 'solid', M);
