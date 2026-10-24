@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>The Haunted Glen</title>
+  <meta name="theme-color" content="#1a1030" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Haunted Glen" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" href="assets/icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Chewy&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+    { "imports": { "three": "./lib/three.module.js" } }
+  </script>
+</head>
+<body>
+  <canvas id="world"></canvas>
+  <canvas id="haunted" class="hidden"></canvas>
+  <div id="touch-layer"></div>
+
+  <div id="joy-base"><div id="joy-knob"></div></div>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div class="hud-left">
+      <div class="pill" id="candy-pill"><span class="pill-icon">🍬</span><span id="candy-count">0</span></div>
+      <div class="pill" id="corn-pill"><span class="pill-icon">🌽</span><span id="corn-count">0/8</span></div>
+    </div>
+    <div class="hud-right">
+      <button class="round-btn" id="btn-time" aria-label="Day or night">🌙</button>
+      <button class="round-btn" id="btn-sound" aria-label="Sound">🔊</button>
+      <button class="swap-btn" id="btn-swap"><span class="swap-face" id="swap-face">J</span><span id="swap-name">Play as Jack</span></button>
+    </div>
+    <div class="hud-bottom-right">
+      <button class="jump-btn" id="btn-jump" aria-label="Jump">⤴</button>
+      <button class="action-btn hidden" id="btn-action"><span class="action-icon" id="action-icon">🚪</span><span class="action-label" id="action-label">Knock</span></button>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden"></div>
+  <div id="bubble" class="hidden"><div class="bubble-name" id="bubble-name"></div><div id="bubble-text"></div></div>
+  <div id="room-label" class="hidden"></div>
+  <div id="candy-burst"></div>
+
+  <!-- Shop -->
+  <div id="shop" class="hidden">
+    <div class="shop-top">
+      <div class="shop-title">Hares Hill Halloween Emporium</div>
+      <div class="hazel"><div class="hazel-face">🐰</div><div class="hazel-text" id="hazel-text">Welcome!</div></div>
+    </div>
+    <div class="shop-sheet">
+      <div class="shop-tabs" id="shop-tabs"></div>
+      <div class="shop-items" id="shop-items"></div>
+      <div class="shop-bar">
+        <button class="shop-btn leave" id="shop-leave">🚪 Leave shop</button>
+        <button class="shop-btn swap" id="shop-swap">Dress Jack</button>
+        <button class="shop-btn buy hidden" id="shop-buy">Buy</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reward -->
+  <div id="reward" class="hidden">
+    <div class="reward-card">
+      <div class="reward-emoji" id="reward-emoji">🎃</div>
+      <div class="reward-title" id="reward-title">You found a prize!</div>
+      <div class="reward-text" id="reward-text"></div>
+      <button class="big-btn" id="reward-ok">Hooray!</button>
+    </div>
+  </div>
+
+  <!-- Title -->
+  <div id="title">
+    <div class="title-sky"></div>
+    <div class="title-inner">
+      <div class="title-logo"><span class="t1">The</span><span class="t2">Haunted Glen</span></div>
+      <div class="title-sub">A Kimberton Glen Halloween</div>
+      <div class="pick-label" id="pick-label">Who's playing?</div>
+      <div class="pick-row">
+        <button class="pick-card selected" data-kid="carter"><div class="pick-avatar carter">C</div><div class="pick-name">Carter</div><div class="pick-age">age 7</div></button>
+        <button class="pick-card" data-kid="jack"><div class="pick-avatar jack">J</div><div class="pick-name">Jack</div><div class="pick-age">age 4</div></button>
+      </div>
+      <button class="big-btn" id="play-btn" disabled><span id="play-label">Building the neighborhood…</span></button>
+      <div class="title-hint">Tap a glowing door to trick-or-treat · Follow the lanterns to Hares Hill</div>
+    </div>
+  </div>
+
+  <div id="fade"></div>
+  <div id="error" class="hidden"></div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

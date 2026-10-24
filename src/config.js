@@ -1,0 +1,151 @@
+// ---------------------------------------------------------------------------
+// The Haunted Glen — world layout and character settings.
+//
+// Everything on the map is placed in "aerial pixels": the x/y position on the
+// Google Maps screenshot of Kimberton Glen (752 x 1416 px, north is up).
+// px() converts those to world units (1 unit ≈ 1 meter, slightly compressed
+// so the neighborhood is quicker to walk across on a tablet).
+// ---------------------------------------------------------------------------
+
+export const MAP_SCALE = 0.32;
+export const MAP_ORIGIN = { x: 420, y: 760 };
+
+export function px(x, y) {
+  return { x: (x - MAP_ORIGIN.x) * MAP_SCALE, z: (y - MAP_ORIGIN.y) * MAP_SCALE };
+}
+
+// World bounds the players can walk inside (aerial pixels).
+export const BOUNDS = { minX: 20, maxX: 745, minY: 392, maxY: 1285 };
+
+// Day/night: one full golden hour -> night -> golden hour loop, in seconds.
+export const DAY_CYCLE_SECONDS = 600;
+
+// --- Characters -----------------------------------------------------------
+// Tweak these to make the boys look like themselves until the Meshy models
+// arrive. Drop rigged models at assets/models/carter.glb / jack.glb later.
+export const CHARACTERS = {
+  carter: {
+    name: 'Carter',
+    age: 7,
+    height: 1.3,
+    skin: '#f2c7a5',
+    hair: '#6b4426',
+    hairStyle: 'short',
+    eyes: '#4a3424',
+    shirt: '#e8742c',
+    pants: '#3d5a80',
+    shoes: '#2b2b2b',
+    speed: 5.6,
+  },
+  jack: {
+    name: 'Jack',
+    age: 4,
+    height: 1.06,
+    skin: '#f4ccad',
+    hair: '#9a6a3c',
+    hairStyle: 'shaggy',
+    eyes: '#4a3424',
+    shirt: '#4f9d4a',
+    pants: '#4a4e69',
+    shoes: '#8a2b2b',
+    speed: 5.6,
+  },
+};
+
+// --- Roads (center lines in aerial pixels, width in world units) -----------
+export const ROADS = [
+  {
+    name: 'Iron Works Rd',
+    width: 7.2,
+    sidewalks: true,
+    pts: [[665, 522], [560, 523], [455, 524], [300, 525], [228, 526], [210, 532], [202, 548], [200, 575],
+      [200, 760], [201, 1015], [202, 1180], [203, 1335]],
+  },
+  {
+    name: 'Brinell St',
+    width: 6.8,
+    sidewalks: true,
+    pts: [[455, 524], [453, 600], [451, 800], [450, 955], [444, 985], [428, 1005], [405, 1013], [300, 1015], [201, 1015]],
+  },
+  {
+    name: 'Crossover Blvd',
+    width: 9,
+    sidewalks: false,
+    pts: [[-60, 1300], [120, 1312], [300, 1338], [420, 1342], [500, 1322], [580, 1262], [700, 1195], [820, 1140]],
+  },
+  {
+    name: 'Snyder Ave',
+    width: 6.5,
+    sidewalks: false,
+    pts: [[-60, 362], [150, 370], [400, 372], [600, 345], [760, 300], [820, 285]],
+  },
+];
+
+export const CUL_DE_SAC = { x: 665, y: 522, r: 40, island: 13 };
+
+// Woods behind the neighborhood (polygons in aerial pixels)
+export const WOODS = [
+  // East woods — home of the trail to Hares Hill
+  [[565, 625], [640, 600], [705, 565], [760, 540], [830, 520], [830, 1240], [620, 1240], [520, 1290], [470, 1260],
+    [468, 990], [530, 880], [560, 790], [552, 700]],
+  // South woods between Brinell and Crossover
+  [[330, 1035], [462, 1020], [470, 1250], [420, 1305], [335, 1300], [322, 1200]],
+  // West tree line
+  [[-80, 395], [72, 400], [78, 600], [72, 900], [60, 1290], [-80, 1290]],
+  // North edge beyond Snyder Ave
+  [[-80, 250], [830, 200], [830, 270], [600, 330], [400, 352], [150, 350], [-80, 342]],
+];
+
+// Little creek in the east woods; the trail crosses it on a footbridge.
+export const CREEK = [[560, 600], [592, 690], [622, 780], [612, 880], [590, 980], [560, 1090], [515, 1260]];
+
+// Trail from the cul-de-sac to the Hares Hill Halloween Emporium
+export const TRAIL = [[714, 556], [724, 605], [700, 680], [655, 745], [625, 785], [640, 835], [662, 880], [668, 915]];
+export const STORE = { x: 668, y: 945, facing: Math.PI }; // door faces north toward the trail
+
+// --- Houses ----------------------------------------------------------------
+// facing: direction the front door faces. 'S' = toward the bottom of the map.
+export const HOME_ID = 'h1018';
+export const HOUSES = [
+  // North row (backs onto Snyder Ave), front doors face the street to the south
+  { id: 'h1022', x: 140, y: 468, facing: 'S' },
+  { id: HOME_ID, x: 226, y: 462, facing: 'S', home: true },
+  { id: 'h1014', x: 307, y: 460, facing: 'S', garage: 1 },
+  { id: 'h1010', x: 390, y: 457, facing: 'S' },
+  { id: 'h1006', x: 466, y: 455, facing: 'S' },
+  { id: 'h1002', x: 556, y: 455, facing: 'S' },
+  { id: 'h1000', x: 650, y: 440, facing: 'S' },
+  { id: 'h0998', x: 733, y: 440, facing: 'SW' },
+  // Cul-de-sac, south side
+  { id: 'h1001', x: 508, y: 592, facing: 'N' },
+  { id: 'h1003', x: 595, y: 590, facing: 'N' },
+  // East side of Brinell
+  { id: 'b101', x: 512, y: 686, facing: 'W' },
+  { id: 'b103', x: 515, y: 775, facing: 'W' },
+  // Inner block, facing Iron Works (west)
+  { id: 'h1011', x: 268, y: 598, facing: 'W' },
+  { id: 'h1013', x: 268, y: 688, facing: 'W' },
+  { id: 'h1015', x: 268, y: 775, facing: 'W' },
+  { id: 'h1017', x: 276, y: 860, facing: 'W' },
+  { id: 'h1019', x: 272, y: 940, facing: 'W' },
+  // Inner block, facing Brinell (east)
+  { id: 'b100', x: 382, y: 602, facing: 'E' },
+  { id: 'b102', x: 384, y: 682, facing: 'E' },
+  { id: 'b104', x: 386, y: 770, facing: 'E' },
+  { id: 'b106', x: 384, y: 852, facing: 'E' },
+  { id: 'b108', x: 388, y: 930, facing: 'E' },
+  // West side of Iron Works, facing east
+  { id: 'h1020', x: 138, y: 592, facing: 'E' },
+  { id: 'h1024', x: 138, y: 672, facing: 'E' },
+  { id: 'h1026', x: 140, y: 752, facing: 'E' },
+  { id: 'h1028', x: 138, y: 840, facing: 'E' },
+  { id: 'h1030', x: 142, y: 918, facing: 'E' },
+  { id: 'h1032', x: 146, y: 998, facing: 'E' },
+  { id: 'h1034', x: 150, y: 1080, facing: 'E' },
+  { id: 'h1036', x: 155, y: 1162, facing: 'E' },
+  // South end, east of Iron Works
+  { id: 'h1021', x: 284, y: 1078, facing: 'W' },
+  { id: 'h1023', x: 288, y: 1162, facing: 'W' },
+];
+
+export const FACING_ANGLE = { S: 0, N: Math.PI, E: Math.PI / 2, W: -Math.PI / 2, SW: -Math.PI / 4 };
