@@ -1,10 +1,12 @@
 import { ITEM } from './costumes.js';
 import { sfx } from './audio.js';
+import { drawSpriteKid } from './kidsprites.js';
 
 // ---------------------------------------------------------------------------
 // The haunted house interior: a 2D top-down (Stardew-style) world that is far
-// bigger inside than outside. Everything is drawn with code in a pixel-art
-// style for now; GPT sprites can replace the draw functions later.
+// bigger inside than outside. The house is drawn with code in a pixel-art
+// style; Carter and Jack are GPT sprites (src/kidsprites.js) with the drawn
+// kid below as a fallback.
 // ---------------------------------------------------------------------------
 
 const T = 16; // pixels per tile (before scaling)
@@ -376,6 +378,7 @@ function shade(hex, amt) {
 function kidLook(cfg, costume) {
   const o = costume.outfit && ITEM[costume.outfit];
   return {
+    id: cfg.name.toLowerCase(),
     skin: cfg.skin,
     hair: cfg.hair,
     shirt: o ? (o.colors?.tex ? o.c2d : o.colors.sleeves) : cfg.shirt,
@@ -390,22 +393,27 @@ function kidLook(cfg, costume) {
   };
 }
 
-function drawKid(g, cx, fy, dir, frame, L) {
+const SPRITE_DRAW = { rect, hat: drawHat, face: drawFace, prop: drawProp, ghostSheet: drawGhostSheet };
+
+function drawGhostSheet(g, cx, fy, dir) {
+  const x = Math.round(cx - 7), top = Math.round(fy - 24);
+  const bob = Math.sin(performance.now() / 200) * 1;
+  g.fillStyle = '#f6f6fa';
+  g.beginPath(); g.moveTo(x + 1, fy - 1 + bob);
+  g.quadraticCurveTo(x - 1, top + 2, x + 7, top + bob); g.quadraticCurveTo(x + 15, top + 2, x + 13, fy - 1 + bob);
+  for (let i = 0; i < 4; i++) g.lineTo(x + 13 - i * 3 - 1.5, fy - 3 + bob + (i % 2) * 2);
+  g.fill();
+  if (dir !== 'up') { rect(g, x + 4, top + 7 + bob, 2, 3, '#121214'); rect(g, x + 9, top + 7 + bob, 2, 3, '#121214'); }
+}
+
+function drawKid(g, cx, fy, dir, frame, L, anim = 0) {
   // cx = center x, fy = feet y (pixels, base scale)
+  if (drawSpriteKid(g, cx, fy, dir, frame > 0, anim, L, SPRITE_DRAW)) return;
   const s = L.small ? 0 : 1; // older brother is a couple of pixels taller
   const x = Math.round(cx - 7), top = Math.round(fy - 23 - s * 2);
   g.fillStyle = 'rgba(0,0,0,0.3)'; g.beginPath(); g.ellipse(cx, fy, 6, 2.2, 0, 0, 7); g.fill();
 
-  if (L.outfit === 'ghost_sheet') {
-    const bob = Math.sin(performance.now() / 200) * 1;
-    g.fillStyle = '#f6f6fa';
-    g.beginPath(); g.moveTo(x + 1, fy - 1 + bob);
-    g.quadraticCurveTo(x - 1, top + 2, x + 7, top + bob); g.quadraticCurveTo(x + 15, top + 2, x + 13, fy - 1 + bob);
-    for (let i = 0; i < 4; i++) g.lineTo(x + 13 - i * 3 - 1.5, fy - 3 + bob + (i % 2) * 2);
-    g.fill();
-    if (dir !== 'up') { rect(g, x + 4, top + 7 + bob, 2, 3, '#121214'); rect(g, x + 9, top + 7 + bob, 2, 3, '#121214'); }
-    return;
-  }
+  if (L.outfit === 'ghost_sheet') { drawGhostSheet(g, cx, fy, dir); return; }
   const step = frame % 2 === 1 ? 1 : 0;
   // legs
   rect(g, x + 4, fy - 6, 3, 5 - step, L.pants); rect(g, x + 8, fy - 6, 3, 5 - (1 - step) * (frame ? 1 : 0), L.pants);
@@ -856,7 +864,7 @@ export class HauntedHouse {
       if (Math.sin(t * 5 + c.y) > 0.6) { rect(g, x + 5, y - 7, 1, 3, '#fff'); rect(g, x + 4, y - 6, 3, 1, '#fff'); }
     }
     // sorted entities
-    const ents = [{ y: this.p.y, draw: () => drawKid(g, this.p.x * T, this.p.y * T, this.p.dir, this.p.frame, this.look) }];
+    const ents = [{ y: this.p.y, draw: () => drawKid(g, this.p.x * T, this.p.y * T, this.p.dir, this.p.frame, this.look, this.p.anim) }];
     for (const gh of this.ghosts) {
       if (gh.state === 'hidden') continue;
       ents.push({
@@ -945,3 +953,6 @@ export const CORN_REWARDS = [
   { at: 6, item: 'pumpkin_head' },
   { at: 8, item: 'ghost_sheet' },
 ];
+
+// for tools / testing
+export { drawKid as _drawKid, kidLook as _kidLook };

@@ -44,6 +44,7 @@ src/costumes.js       costume catalog (add new items here)
 src/character.js      the kids + costume anchors (stand-in body until the model loads)
 src/meshykid.js       loads the Meshy boys: animation, bone anchors, outfit recolor
 src/haunted2d.js      the 2D haunted house
+src/kidsprites.js     Carter and Jack's pixel sprites (atlas, outfit recolor, costume spots)
 src/audio.js          sound effects (synthesized, no files needed)
 lib/                  three.js r170 (bundled so it works offline)
 assets/               icons, and future models / sprites / music
@@ -54,7 +55,8 @@ Everything on the map is placed using pixel positions from the aerial screenshot
 ## Coming next / how to plug in assets
 
 - **Meshy models:** Carter and Jack are the rigged Meshy models in `assets/models/` (`src/meshykid.js`). They play idle, walk and run, costume pieces ride on the head, hand and spine bones, and outfits recolor the shirt, sleeves, pants and shoes. To swap in a new model, export from Meshy with animations as `.glb`, shrink the textures to 1024 px, and replace the file. The simple stand-in kid shows while a model downloads.
-- **GPT sprites for the haunted house:** pixel tiles at 16 px (32 px also fine). They'll replace the draw functions in `src/haunted2d.js`.
+- **Kid sprites in the haunted house:** the GPT sprite sheets live in `tools/sprite_src/`. Run `python3 tools/build_sprites.py` to cut them out, snap them to a real pixel grid (Carter 32 px, Jack 27 px tall), and write `assets/sprites/`. Costumes are drawn on top, and outfits recolor the shirt, pants and shoes. Open `tools/sprite_preview.html` on a local server to see every costume in every direction.
+- **Room tiles:** GPT pixel tiles at 16 px could replace the draw functions in `src/haunted2d.js` the same way.
 - **Theme music:** put an mp3 at `assets/music/theme.mp3`, and it plays automatically on a loop.
 
 ## Elevation

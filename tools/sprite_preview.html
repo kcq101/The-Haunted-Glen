@@ -1,0 +1,23 @@
+<!doctype html><html><head><script type="importmap">{ "imports": { "three": "../lib/three.module.js" } }</script></head>
+<body style="margin:0;background:#2a2238"><canvas id="c"></canvas>
+<script type="module">
+import { _drawKid, _kidLook } from '../src/haunted2d.js';
+import { spritesReady } from '../src/kidsprites.js';
+import { CHARACTERS } from '../src/config.js';
+await spritesReady;
+const sets = [{}, { hat: 'pirate_hat', face: 'eyepatch', outfit: 'pirate_outfit', prop: 'cutlass' }, { hat: 'fire_helmet', outfit: 'fire_outfit', prop: 'hose' },
+ { outfit: 'vampire_outfit', hat: 'vamp_hair', face: 'fangs', prop: 'lantern' }, { outfit: 'hero_outfit', face: 'hero_mask', prop: 'hero_shield' },
+ { outfit: 'skeleton_outfit', hat: 'pumpkin_head', prop: 'candy_pail' }, { outfit: 'astro_outfit', hat: 'space_helmet', prop: 'blaster' },
+ { outfit: 'mummy_outfit', face: 'skull_mask', prop: 'parrot' }, { outfit: 'ghost_sheet' }];
+const dirs = ['down', 'right', 'up', 'left'];
+const Z = 4, cellW = 30, cellH = 44;
+const c = document.getElementById('c'); c.width = sets.length * dirs.length * cellW * Z / 2; c.height = 2 * cellH * Z * 2 + 10;
+const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.scale(Z, Z);
+['carter', 'jack'].forEach((k, ki) => sets.forEach((s, si) => dirs.forEach((d, di) => {
+  const L = _kidLook(CHARACTERS[k], { hat: null, face: null, outfit: null, prop: null, ...s });
+  const col = si * 4 + di, half = sets.length * 2;
+  const x = (col % half) * cellW / 2 * 1 + 0, row = ki * 2 + Math.floor(col / half);
+  _drawKid(g, (col % half) * cellW + cellW / 2, row * cellH + cellH - 4, d, 0, L, 0);
+})));
+window.done = true;
+</script></body></html>
