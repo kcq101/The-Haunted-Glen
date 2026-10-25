@@ -258,7 +258,7 @@ function buildOne(B, s, M) {
   }
   for (const cx of [-W * 0.3, 0, W * 0.3]) {
     for (const row of [1.7, 4.4]) {
-      if (s.walkout && cx < -W * 0.2 && row < 3) continue; // slider to the deck instead
+      if (s.walkout && cx === 0 && row < 3) continue; // slider to the deck instead
       addWindow(B, M, cx, row, -D / 2 - 0.02, 1.1, 1.45, { ry: Math.PI, haunted });
     }
   }
@@ -323,11 +323,10 @@ function addWalkout(B, s, M) {
   // basement walls in siding, 4 cm proud of the foundation so they never flicker
   B.add(GEO.box, s.siding, { y: (-0.05 - drop - 0.5) / 2, sx: W + 0.38, sy: drop + 0.45, sz: D + 0.38 }, 'solid', M);
   const bw = back - 0.19; // basement back face
-  // sliders sit right of center, seen from the back yard (local -x)
-  const slX = -Math.min(2.4, W * 0.21);
-  addSlider(B, M, slX, -drop + 0.05, bw, 2.3);
-  // main-floor slider onto the deck
-  addSlider(B, M, slX, 0.05, back - 0.02, 2.3);
+  // basement slider under the far-right back windows (seen from the yard: local -x)
+  addSlider(B, M, -W * 0.3, -drop + 0.05, bw, 2.3);
+  // main-floor slider onto the deck, in the middle
+  addSlider(B, M, 0, 0.05, back - 0.02, 2.3);
 
   // deck
   const dw = Math.min(W * 0.62, 7.4), dd = 3.8, dz = back - 0.2 - dd / 2, top = -0.12;
