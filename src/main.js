@@ -5,6 +5,7 @@ import { createTerrain, storePos, setElevation } from './terrain.js';
 import { makeHouseSpecs, groundMarks, buildHouses } from './houses.js';
 import { Builder } from './builder.js';
 import { createTrees, createFallingLeaves } from './nature.js';
+import { createBackdrop } from './backdrop.js';
 import { GlowField } from './glow.js';
 import { DayNight, NIGHT_START } from './sky.js';
 import { decorateNeighborhood, addStreetLamps, addTrail, hauntHome, addBoundaryFence } from './decor.js';
@@ -81,6 +82,8 @@ function buildWorld() {
   const terrain = createTerrain([...specs.map((s) => s.pad), storePad], marks.driveways, marks.walkways);
   scene.add(terrain.mesh);
   W.heightAt = terrain.heightAt;
+  // countryside, farms and hazy hills beyond the neighborhood
+  W.backdrop = createBackdrop(scene, terrain, renderer.getPixelRatio());
   W.specs = specs;
 
   const B = new Builder();
@@ -722,6 +725,7 @@ function updateWorld(dt) {
   camera.position.copy(cam.pos);
   camera.lookAt(cam.target);
   if (window.__debugCam) { camera.position.set(...window.__debugCam.pos); camera.lookAt(...window.__debugCam.look); if (window.__debugCam.nofog) { scene.fog.near = 1e4; scene.fog.far = 1e5; } }
+  W.backdrop.update(sky, camera);
   renderer.render(scene, camera);
 }
 
@@ -769,6 +773,7 @@ function frame(now) {
     mats.shopwin.color.copy(dayShop).lerp(nightShop, n);
     glows.update(n, time, renderer.domElement.height);
     W.haunt.update(dt, time, n);
+    W.backdrop.update(sky, camera);
     renderer.render(scene, camera);
     return;
   }

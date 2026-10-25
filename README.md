@@ -38,6 +38,7 @@ src/houses.js         house builder (home is modeled on the street view)
 src/decor.js          Halloween decorations, street lamps, trail lanterns, haunted extras
 src/nature.js         fall trees and falling leaves
 src/sky.js            golden hour / night cycle
+src/backdrop.js       the world beyond: farm fields, barns and hazy hills on the horizon
 src/store.js          Hares Hill Emporium (outside, inside, and Hazel)
 src/costumes.js       costume catalog (add new items here)
 src/character.js      the kids' 3D models + costume anchors

@@ -7,6 +7,8 @@ import { fbm, noise2, polylineDistance, pointInPolygon, smoothstep, lerp, chaiki
 const X0 = px(-80, 0).x, X1 = px(830, 0).x;
 const Z0 = px(0, 180).z, Z1 = px(0, 1420).z;
 const STEP = 1.6;
+// The playable ground's outline; the distant backdrop (backdrop.js) starts here.
+export const TERRAIN_RECT = { x0: X0, x1: X1, z0: Z0, z1: Z1 };
 
 const P = (arr) => arr.map(([x, y]) => px(x, y));
 
@@ -232,7 +234,7 @@ export function createTerrain(pads, driveways, walkways) {
   const street = buildStreetMesh(heightAt, mat);
   street.receiveShadow = true;
   group.add(street);
-  return { mesh: group, heightAt };
+  return { mesh: group, heightAt, groundCanvas: tex.image };
 }
 
 // High-detail strips along every road (and the cul-de-sac) with a crisp curb
