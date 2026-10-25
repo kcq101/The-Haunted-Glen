@@ -131,11 +131,12 @@ export function createTerrain(pads, driveways, walkways) {
       const lzs = dx * Math.sin(p.rot) + dz * Math.cos(p.rot); // + toward the front
       let target = p.h, hdBack = p.hd;
       if (p.walkout) {
-        // walkout: level in front, sloping down along the sides of the house to
-        // a back yard one story lower
+        // walkout: the house and front yard are built up a story above the
+        // natural ground; it slopes down along the sides to the back yard,
+        // which stays at the natural level
         const wo = p.walkout;
         hdBack = p.hd + wo.yard;
-        target = p.h - wo.drop * smoothstep(wo.depth * 0.1, -wo.depth / 2 - 0.6, lzs);
+        target = p.h + wo.drop * (1 - smoothstep(wo.depth * 0.1, -wo.depth / 2 - 0.6, lzs));
       }
       const d = Math.max(lx - p.hw, lzs >= 0 ? lzs - p.hd : -lzs - hdBack, 0);
       const w = 1 - smoothstep(0.5, 5, d);

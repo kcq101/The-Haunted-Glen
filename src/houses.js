@@ -258,7 +258,7 @@ function buildOne(B, s, M) {
   }
   for (const cx of [-W * 0.3, 0, W * 0.3]) {
     for (const row of [1.7, 4.4]) {
-      if (s.walkout && cx === 0 && row < 3) continue; // slider to the deck instead
+      if (s.walkout && cx < -W * 0.2 && row < 3) continue; // slider to the deck instead
       addWindow(B, M, cx, row, -D / 2 - 0.02, 1.1, 1.45, { ry: Math.PI, haunted });
     }
   }
@@ -315,7 +315,7 @@ function addSlider(B, M, x, y0, z, w) {
   B.add(GEO.box, '#7d7a74', { x, y: y0 + 0.03, z: z - 0.15, sx: w + 0.1, sy: 0.06, sz: 0.1 }, 'solid', M); // track
 }
 
-// Walkout basement (exposed at the back, ground slopes down) with a raised
+// Walkout basement (house built up above the back yard) with a raised
 // deck off the main floor: posts, white railings and stairs down to the yard.
 function addWalkout(B, s, M) {
   const { W, D } = s, drop = s.walkout;
@@ -323,10 +323,11 @@ function addWalkout(B, s, M) {
   // basement walls in siding, 4 cm proud of the foundation so they never flicker
   B.add(GEO.box, s.siding, { y: (-0.05 - drop - 0.5) / 2, sx: W + 0.38, sy: drop + 0.45, sz: D + 0.38 }, 'solid', M);
   const bw = back - 0.19; // basement back face
-  addSlider(B, M, 0, -drop + 0.05, bw, 2.3);
-  for (const cx of [-W * 0.33, W * 0.33]) addWindow(B, M, cx, -drop + 1.45, bw - 0.06, 1.0, 1.0, { ry: Math.PI });
+  // sliders sit right of center, seen from the back yard (local -x)
+  const slX = -Math.min(2.4, W * 0.21);
+  addSlider(B, M, slX, -drop + 0.05, bw, 2.3);
   // main-floor slider onto the deck
-  addSlider(B, M, 0, 0.05, back - 0.02, 2.3);
+  addSlider(B, M, slX, 0.05, back - 0.02, 2.3);
 
   // deck
   const dw = Math.min(W * 0.62, 7.4), dd = 3.8, dz = back - 0.2 - dd / 2, top = -0.12;
