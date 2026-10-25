@@ -19,6 +19,37 @@ function insideAnyPad(x, z, specs, margin) {
   return false;
 }
 
+// Keep yard trees off the sidewalks: if a spot lands on (or right next to)
+// a sidewalk, slide it back into the yard. Returns null if it can't be placed.
+const SIDEWALK_OUT = 3.5; // sidewalk outer edge, past the road's half width
+function offSidewalk(p, specs) {
+  let x = p.x, z = p.z;
+  for (let pass = 0; pass < 2; pass++) {
+    for (const r of roadLines) {
+      if (!r.sidewalks) continue;
+      const n = polylineDistance(x, z, r.line);
+      const need = r.width / 2 + SIDEWALK_OUT + 1.2;
+      if (n.d < need) {
+        const dx = x - n.x, dz = z - n.z, L = Math.hypot(dx, dz) || 1;
+        x = n.x + (dx / L) * need; z = n.z + (dz / L) * need;
+      }
+    }
+    const dc = Math.hypot(x - culDeSac.x, z - culDeSac.z), needC = culDeSac.r + SIDEWALK_OUT + 1.2;
+    if (dc < needC && dc > culDeSac.island) {
+      x = culDeSac.x + ((x - culDeSac.x) / dc) * needC; z = culDeSac.z + ((z - culDeSac.z) / dc) * needC;
+    }
+  }
+  // and off the driveways and front walks
+  for (const s of specs) {
+    for (const seg of [s.driveway, s.walk]) {
+      if (!seg) continue;
+      const pts = seg.mid ? [seg.a, seg.mid, seg.b] : [seg.a, seg.b];
+      if (polylineDistance(x, z, pts).d < seg.width / 2 + 1.0) return null;
+    }
+  }
+  return { x, z };
+}
+
 function nearRoad(x, z, extra) {
   for (const r of roadLines) if (polylineDistance(x, z, r.line).d < r.width / 2 + extra) return true;
   return Math.hypot(x - culDeSac.x, z - culDeSac.z) < culDeSac.r + extra;
@@ -103,14 +134,14 @@ export function createTrees(specs, heightAt) {
     for (let i = 0; i < count; i++) {
       const lx = s.home ? -1.4 + 6.9 : (r() - 0.5) * s.W * 1.1 - s.garageSide * 2;
       const lz = s.home ? s.D / 2 + 9.2 : s.D / 2 + 6 + r() * 5;
-      const p = toWorld(s, lx, lz);
-      if (nearRoad(p.x, p.z, 2.5)) continue;
+      const p = offSidewalk(toWorld(s, lx, lz), specs);
+      if (!p || nearRoad(p.x, p.z, 2.5) || insideAnyPad(p.x, p.z, specs, 0.5)) continue;
       trees.push({ x: p.x, z: p.z, s: 0.55 + r() * 0.2, conifer: false, color: STREET_FALL[(r() * STREET_FALL.length) | 0], woods: false });
     }
     // a few backyard trees
     if (!s.home && r() < 0.5) {
-      const p = toWorld(s, (r() - 0.5) * 12, -s.D / 2 - 7 - r() * 4);
-      if (!nearRoad(p.x, p.z, 4) && !insideAnyPad(p.x, p.z, specs, 1)) trees.push({ x: p.x, z: p.z, s: 0.75 + r() * 0.3, conifer: r() < 0.3, color: FALL[(r() * FALL.length) | 0], woods: false });
+      const p = offSidewalk(toWorld(s, (r() - 0.5) * 12, -s.D / 2 - 7 - r() * 4), specs) || { x: 1e9, z: 1e9 };
+      if (p.x < 1e8 && !nearRoad(p.x, p.z, 4) && !insideAnyPad(p.x, p.z, specs, 1)) trees.push({ x: p.x, z: p.z, s: 0.75 + r() * 0.3, conifer: r() < 0.3, color: FALL[(r() * FALL.length) | 0], woods: false });
     }
   }
   // Cul-de-sac island tree
