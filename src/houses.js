@@ -85,13 +85,20 @@ export function makeHouseSpecs() {
       : toWorld(spec, spec.gx, spec.gz + spec.gd / 2 + 0.2);
     const road = nearestRoad(garageFront, h.street);
     spec.driveway = { a: garageFront, b: { x: road.x, z: road.z }, width: spec.home ? 4.4 : 5.4 };
+    if (h.sideLoad) {
+      // side-load garage: doors on the outer side, driveway straight out to the street
+      spec.sideLoad = true;
+      spec.driveway.a = toWorld(spec, spec.gx + spec.garageSide * (spec.gw / 2 + 0.2), spec.gz);
+      const r = nearestRoad(spec.driveway.a, h.street);
+      spec.driveway.b = { x: r.x, z: r.z };
+    }
     if (spec.home) {
       // the real driveway runs up the right side to a side-load garage
       spec.driveway.a = toWorld(spec, spec.gx + spec.garageSide * (spec.gw / 2 + 2.2), -spec.D / 2);
       spec.driveway.mid = toWorld(spec, spec.gx + spec.garageSide * (spec.gw / 2 + 2.2), spec.D / 2 + 2);
     }
     const doorPt = toWorld(spec, spec.doorX, spec.D / 2 + 0.6);
-    const roadDoor = nearestRoad(doorPt, h.street);
+    const roadDoor = nearestRoad(doorPt, h.sideLoad ? null : h.street); // side-load: the front walk still goes to the street it faces
     const dx = doorPt.x - roadDoor.x, dz = doorPt.z - roadDoor.z;
     const dl = Math.hypot(dx, dz) || 1;
     const off = roadDoor.width / 2 + 2.6;
@@ -263,9 +270,17 @@ function buildOne(B, s, M) {
     for (const lz of [-2.0, 1.2]) B.add(GEO.box, '#ecebe6', { x: sx, y: 1.15, z: s.gz + lz, ry: Math.PI / 2, sx: 2.6, sy: 2.3, sz: 0.08 }, 'solid', M);
   } else {
     addGableRoof(B, { w: s.gw, d: s.gd, h: 2.2, roofColor: s.roof, wallColor: s.siding, parent: M, x: s.gx, y: s.gh, z: s.gz });
-    const gzF = s.gz + s.gd / 2 + 0.04;
     const two = rng() < 0.5;
-    const doorsX = two ? [s.gx - 1.55, s.gx + 1.55] : [s.gx];
+    if (s.sideLoad) {
+      // doors on the outer side wall, facing the side street
+      const sx = s.gx + s.garageSide * (s.gw / 2 + 0.04);
+      for (const lz of [-1.75, 1.75]) {
+        B.add(GEO.box, '#f0eee8', { x: sx, y: 1.15, z: s.gz + lz, ry: Math.PI / 2, sx: 2.9, sy: 2.3, sz: 0.08 }, 'solid', M);
+        for (let k = 0; k < 3; k++) B.add(GEO.box, '#cfcbc2', { x: sx + s.garageSide * 0.05, y: 0.5 + k * 0.6, z: s.gz + lz, ry: Math.PI / 2, sx: 2.8, sy: 0.05, sz: 0.03 }, 'solid', M);
+      }
+    }
+    const gzF = s.gz + s.gd / 2 + 0.04;
+    const doorsX = s.sideLoad ? [] : two ? [s.gx - 1.55, s.gx + 1.55] : [s.gx];
     for (const gx of doorsX) {
       B.add(GEO.box, '#f0eee8', { x: gx, y: 1.15, z: gzF, sx: two ? 2.6 : 5.2, sy: 2.3, sz: 0.08 }, 'solid', M);
       for (let k = 0; k < 3; k++) B.add(GEO.box, '#cfcbc2', { x: gx, y: 0.5 + k * 0.6, z: gzF + 0.05, sx: two ? 2.5 : 5.1, sy: 0.05, sz: 0.03 }, 'solid', M);

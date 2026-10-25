@@ -136,9 +136,9 @@ export const HOUSES = [
   { id: 'h1017', x: 276, y: 860, facing: 'W' },
   { id: 'h1019', x: 272, y: 940, facing: 'W' },
   // Inner block, facing Brinell (east)
-  // Corner of Brinell and Iron Works: faces Iron Works (north), garage on the
-  // left with the driveway out to Iron Works
-  { id: 'b100', x: 382, y: 590, facing: 'N', garage: -1, street: 'Iron Works Rd' },
+  // Corner of Brinell and Iron Works: faces Brinell, garage on the Iron Works
+  // side (doors on the side) with the driveway out to Iron Works
+  { id: 'b100', x: 382, y: 602, facing: 'E', garage: 1, sideLoad: true, street: 'Iron Works Rd' },
   { id: 'b102', x: 384, y: 682, facing: 'E' },
   { id: 'b104', x: 386, y: 770, facing: 'E' },
   { id: 'b106', x: 384, y: 852, facing: 'E' },
