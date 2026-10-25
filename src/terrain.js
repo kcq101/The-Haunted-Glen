@@ -44,6 +44,23 @@ function lidar(x, z) {
   return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
 }
 
+// Brinell St and the lots on both sides are built up a story (WALKOUT_RAISE),
+// so the houses on the west side have walkout basements out back while their
+// front yards stay level with the street. Eases back to the natural ground
+// near Iron Works at both ends, behind the houses, and into the woods.
+export const WALKOUT_RAISE = 2.7;
+const brinellLine = () => roadLines.find((r) => r.name === 'Brinell St').line;
+function brinellRaise(x, z) {
+  const n = polylineDistance(x, z, brinellLine());
+  const lateral = 1 - smoothstep(24, 36, n.d);
+  if (lateral <= 0) return 0;
+  // the east side starts further south, past the corner house on the cul-de-sac side
+  const east = smoothstep(-4, 4, x - n.x);
+  const z0 = lerp(px(0, 548).z, px(0, 640).z, east), z1 = lerp(px(0, 606).z, px(0, 680).z, east);
+  const along = smoothstep(z0, z1, n.z) * (1 - smoothstep(px(0, 958).z, px(0, 1012).z, n.z));
+  return WALKOUT_RAISE * lateral * along;
+}
+
 function natural(x, z) {
   if (ELEV) {
     // real elevation, plus a little channel so the creek reads as a creek
@@ -67,6 +84,7 @@ function natural(x, z) {
       const street = lidar(x, northRoadZ);
       if (h > street) h = street + (h - street) * (1 - NORTH_RISE_CUT * north); // only lower, never sink
     }
+    h += brinellRaise(x, z);
     return h;
   }
   let h = 0;
@@ -131,12 +149,12 @@ export function createTerrain(pads, driveways, walkways) {
       const lzs = dx * Math.sin(p.rot) + dz * Math.cos(p.rot); // + toward the front
       let target = p.h, hdBack = p.hd;
       if (p.walkout) {
-        // walkout: the house and front yard are built up a story above the
-        // natural ground; it slopes down along the sides to the back yard,
-        // which stays at the natural level
+        // walkout: the house sits level with the (raised) street; the ground
+        // slopes down along the sides to a back yard a story lower, back at
+        // the natural level
         const wo = p.walkout;
         hdBack = p.hd + wo.yard;
-        target = p.h + wo.drop * (1 - smoothstep(wo.depth * 0.1, -wo.depth / 2 - 0.6, lzs));
+        target = p.h - wo.drop * smoothstep(wo.depth * 0.1, -wo.depth / 2 - 0.6, lzs);
       }
       const d = Math.max(lx - p.hw, lzs >= 0 ? lzs - p.hd : -lzs - hdBack, 0);
       const w = 1 - smoothstep(0.5, 5, d);
