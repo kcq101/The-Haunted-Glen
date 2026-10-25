@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { litMat, HIGH } from './quality.js';
+import { mergeVertices } from '../lib/addons/utils/BufferGeometryUtils.js';
 import { makeRng, polylineDistance, pointInPolygon, fbm } from './util.js';
 import { woodsPolys, roadLines, creekLine, trailLine, culDeSac, storePos } from './terrain.js';
 import { toWorld } from './houses.js';
@@ -20,6 +22,51 @@ function insideAnyPad(x, z, specs, margin) {
 function nearRoad(x, z, extra) {
   for (const r of roadLines) if (polylineDistance(x, z, r.line).d < r.width / 2 + extra) return true;
   return Math.hypot(x - culDeSac.x, z - culDeSac.z) < culDeSac.r + extra;
+}
+
+
+// Smooth, lumpy canopy blob: rounded (shared vertices -> soft shading), with
+// clumps of leaves bulging out, darker underneath and inside like real foliage.
+function leafyBlob(detail) {
+  let g = new THREE.IcosahedronGeometry(1, detail);
+  g.deleteAttribute('normal');
+  g.deleteAttribute('uv');
+  g = mergeVertices(g);
+  const p = g.attributes.position;
+  const col = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const clumps = fbm(x * 2.6 + 4, z * 2.6 + y * 1.7, 3);
+    const k = 0.8 + clumps * 0.38;
+    const yy = y < 0 ? y * 0.82 : y; // flatter underside
+    p.setXYZ(i, x * k, yy * k, z * k);
+    // shade: dark underside, brighter clump tips and top
+    const shade = 0.62 + 0.22 * (y * 0.5 + 0.5) + 0.3 * (clumps - 0.5);
+    col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = Math.min(1.05, Math.max(0.45, shade));
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+// Pine tier: a 14-sided cone with a slightly drooping, jagged skirt.
+function pineTier() {
+  const g = new THREE.ConeGeometry(1, 1.6, 14, 3);
+  const p = g.attributes.position;
+  const col = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const a = Math.atan2(z, x);
+    const r = Math.hypot(x, z);
+    const jag = 1 + 0.12 * Math.sin(a * 7) * (r > 0.01 ? 1 : 0);
+    const droop = r > 0.6 ? -0.12 * (r - 0.6) : 0;
+    p.setXYZ(i, x * jag, y + droop, z * jag);
+    const shade = 0.7 + 0.35 * ((y + 0.8) / 1.6);
+    col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = shade;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return g;
 }
 
 export function createTrees(specs, heightAt) {
@@ -71,21 +118,25 @@ export function createTrees(specs, heightAt) {
 
   // --- instanced meshes, one set per map chunk so off-screen woods are skipped ---
   const blobsPer = 3;
-  const trunkGeo = new THREE.CylinderGeometry(0.22, 0.34, 1, 6);
+  const trunkGeo = new THREE.CylinderGeometry(0.22, 0.34, 1, HIGH ? 9 : 6);
   trunkGeo.translate(0, 0.5, 0);
-  const trunkMat = new THREE.MeshLambertMaterial({ color: '#5a3d2b' });
-  const blobGeo = new THREE.IcosahedronGeometry(1, 1);
-  // squash vertices a touch so canopies feel hand-made
-  const bp = blobGeo.attributes.position;
-  for (let i = 0; i < bp.count; i++) {
-    const n = fbm(bp.getX(i) * 2 + 4, bp.getZ(i) * 2 + bp.getY(i), 2);
-    const k = 0.86 + n * 0.3;
-    bp.setXYZ(i, bp.getX(i) * k, bp.getY(i) * k, bp.getZ(i) * k);
+  const trunkMat = litMat({ color: '#5a3d2b', ...(HIGH ? { roughness: 0.95 } : {}) });
+  // woods canopies are many and mostly further away; yard trees get the extra detail
+  const blobGeo = HIGH ? leafyBlob(2) : new THREE.IcosahedronGeometry(1, 1);
+  const yardGeo = HIGH ? leafyBlob(3) : blobGeo;
+  if (!HIGH) {
+    // squash vertices a touch so canopies feel hand-made
+    const bp = blobGeo.attributes.position;
+    for (let i = 0; i < bp.count; i++) {
+      const n = fbm(bp.getX(i) * 2 + 4, bp.getZ(i) * 2 + bp.getY(i), 2);
+      const k = 0.86 + n * 0.3;
+      bp.setXYZ(i, bp.getX(i) * k, bp.getY(i) * k, bp.getZ(i) * k);
+    }
+    blobGeo.computeVertexNormals();
   }
-  blobGeo.computeVertexNormals();
-  const blobMat = new THREE.MeshLambertMaterial({ color: '#ffffff' });
-  const coneGeo = new THREE.ConeGeometry(1, 1.6, 7);
-  const coneMat = new THREE.MeshLambertMaterial({ color: '#ffffff' });
+  const blobMat = litMat({ color: '#ffffff', vertexColors: HIGH });
+  const coneGeo = HIGH ? pineTier() : new THREE.ConeGeometry(1, 1.6, 7);
+  const coneMat = litMat({ color: '#ffffff', vertexColors: HIGH });
 
   const chunks = new Map();
   for (const t of trees) {
@@ -102,7 +153,10 @@ export function createTrees(specs, heightAt) {
     const nDec = list.filter((t) => !t.conifer).length;
     const nCon = list.length - nDec;
     const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, list.length);
-    const blobs = nDec ? new THREE.InstancedMesh(blobGeo, blobMat, nDec * blobsPer) : null;
+    const nYard = list.filter((t) => !t.conifer && !t.woods).length;
+    const blobs = nDec - nYard ? new THREE.InstancedMesh(blobGeo, blobMat, (nDec - nYard) * blobsPer) : null;
+    const yard = nYard ? new THREE.InstancedMesh(yardGeo, blobMat, nYard * blobsPer) : null;
+    let yi = 0;
     const cones = nCon ? new THREE.InstancedMesh(coneGeo, coneMat, nCon * 3) : null;
     let ti = 0, bi = 0, ci = 0;
     for (const t of list) {
@@ -130,12 +184,12 @@ export function createTrees(specs, heightAt) {
             q,
             sc.set(r, r * 0.85, r),
           );
-          blobs.setMatrixAt(bi, m);
-          blobs.setColorAt(bi++, col.copy(base).offsetHSL((rng() - 0.5) * 0.03, 0, (rng() - 0.5) * 0.1));
+          col.copy(base).offsetHSL((rng() - 0.5) * 0.03, 0, (rng() - 0.5) * 0.1);
+          if (t.woods) { blobs.setMatrixAt(bi, m); blobs.setColorAt(bi++, col); } else { yard.setMatrixAt(yi, m); yard.setColorAt(yi++, col); }
         }
       }
     }
-    for (const im of [trunks, blobs, cones]) {
+    for (const im of [trunks, blobs, yard, cones]) {
       if (!im) continue;
       im.castShadow = true;
       im.receiveShadow = true;

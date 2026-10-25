@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { litMat } from './quality.js';
 import { GEO, addGableRoof } from './builder.js';
 import { addPumpkin, textTexture } from './decor.js';
 import { storePos } from './terrain.js';
@@ -73,7 +74,7 @@ export function buildStoreExterior(B, glows, scene, heightAt) {
   hare.lineTo(0.5, 1.9); hare.lineTo(0.3, 1.9); hare.lineTo(0.35, 0.9);
   hare.quadraticCurveTo(-0.6, 1.0, -1, 0.4); hare.closePath();
   const hg = new THREE.ExtrudeGeometry(hare, { depth: 0.08, bevelEnabled: false });
-  const hm = new THREE.Mesh(hg, new THREE.MeshLambertMaterial({ color: '#2b2622' }));
+  const hm = new THREE.Mesh(hg, litMat({ color: '#2b2622' }));
   hm.position.set(storePos.x, y + SH + 0.9 + 5.4, storePos.z);
   hm.rotation.y = STORE.facing + 0.4;
   hm.scale.setScalar(0.9);
@@ -121,9 +122,9 @@ export function buildStoreExterior(B, glows, scene, heightAt) {
 // --- shopkeeper -------------------------------------------------------------
 export function makeHare() {
   const g = new THREE.Group();
-  const fur = new THREE.MeshLambertMaterial({ color: '#b89a78' });
-  const light = new THREE.MeshLambertMaterial({ color: '#efe3d0' });
-  const vest = new THREE.MeshLambertMaterial({ color: '#6a3a8a' });
+  const fur = litMat({ color: '#b89a78' });
+  const light = litMat({ color: '#efe3d0' });
+  const vest = litMat({ color: '#6a3a8a' });
   const dark = new THREE.MeshBasicMaterial({ color: '#1a1410' });
   const S = new THREE.SphereGeometry(1, 18, 14);
   const m = (mat, x, y, z, sx, sy, sz, parent = g) => {
@@ -149,7 +150,7 @@ export function makeHare() {
     ear.rotation.z = sd * -0.15;
     head.add(ear);
     m(fur, 0, 0.45, 0, 0.11, 0.5, 0.07, ear);
-    m(new THREE.MeshLambertMaterial({ color: '#e2a6a0' }), 0, 0.45, 0.04, 0.06, 0.4, 0.03, ear);
+    m(litMat({ color: '#e2a6a0' }), 0, 0.45, 0.04, 0.06, 0.4, 0.03, ear);
     // spectacles
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.09, 0.015, 6, 14), new THREE.MeshBasicMaterial({ color: '#c9a640' }));
     ring.position.set(sd * 0.16, 0.08, 0.36);
@@ -157,7 +158,7 @@ export function makeHare() {
     m(fur, sd * 0.5, 1.05, 0.1, 0.13, 0.42, 0.13);
   }
   // little top hat
-  const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.3, 14), new THREE.MeshLambertMaterial({ color: '#2a1f30' }));
+  const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.3, 14), litMat({ color: '#2a1f30' }));
   hat.position.set(0.15, 0.34, 0); hat.rotation.z = -0.25;
   head.add(hat);
   g.userData.head = head;
@@ -192,10 +193,10 @@ export function buildStoreInterior() {
   ft.colorSpace = THREE.SRGBColorSpace;
   ft.wrapS = ft.wrapT = THREE.RepeatWrapping;
   ft.repeat.set(3, 3);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshLambertMaterial({ map: ft }));
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), litMat({ map: ft }));
   floor.rotation.x = -Math.PI / 2;
   scene.add(floor);
-  const wallMat = new THREE.MeshLambertMaterial({ color: '#5a3a5e' });
+  const wallMat = litMat({ color: '#5a3a5e' });
   const back = new THREE.Mesh(new THREE.PlaneGeometry(W, H), wallMat);
   back.position.set(0, H / 2, -D / 2);
   scene.add(back);
@@ -206,7 +207,7 @@ export function buildStoreInterior() {
     scene.add(side);
   }
   // wainscoting + beams
-  const wood = new THREE.MeshLambertMaterial({ color: '#4a3020' });
+  const wood = litMat({ color: '#4a3020' });
   const box = (mat, x, y, z, sx, sy, sz, ry = 0) => {
     const o = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat);
     o.position.set(x, y, z); o.rotation.y = ry;
@@ -225,7 +226,7 @@ export function buildStoreInterior() {
         const c = colors[ci++ % colors.length];
         const kind = (ci * 7) % 3;
         const geo = kind === 0 ? new THREE.ConeGeometry(0.28, 0.55, 10) : kind === 1 ? new THREE.SphereGeometry(0.28, 10, 8) : new THREE.BoxGeometry(0.45, 0.5, 0.35);
-        const o = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: c }));
+        const o = new THREE.Mesh(geo, litMat({ color: c }));
         o.position.set(sx - 1.6 + k * 0.8, 1.6 + row * 1.25 + 0.32, -D / 2 + 0.45);
         scene.add(o);
       }
@@ -233,24 +234,24 @@ export function buildStoreInterior() {
   }
   // counter with the shopkeeper
   box(wood, 2.3, 0.6, -2.2, 3.0, 1.2, 1.2);
-  box(new THREE.MeshLambertMaterial({ color: '#6a3a8a' }), 2.3, 1.25, -2.2, 3.2, 0.1, 1.4);
+  box(litMat({ color: '#6a3a8a' }), 2.3, 1.25, -2.2, 3.2, 0.1, 1.4);
   const hare = makeHare();
   hare.position.set(2.4, 0, -3.3);
   hare.rotation.y = -0.5;
   scene.add(hare);
   // costume racks
   for (const sx of [-5.5, -3.2]) {
-    box(new THREE.MeshLambertMaterial({ color: '#c9a640' }), sx, 1.9, 1.5, 1.8, 0.06, 0.06);
+    box(litMat({ color: '#c9a640' }), sx, 1.9, 1.5, 1.8, 0.06, 0.06);
     for (const k of [-0.6, 0, 0.6]) {
-      const cloak = new THREE.Mesh(new THREE.ConeGeometry(0.32, 1.3, 10), new THREE.MeshLambertMaterial({ color: colors[(ci++) % colors.length] }));
+      const cloak = new THREE.Mesh(new THREE.ConeGeometry(0.32, 1.3, 10), litMat({ color: colors[(ci++) % colors.length] }));
       cloak.position.set(sx + k, 1.2, 1.5);
       scene.add(cloak);
     }
-    box(new THREE.MeshLambertMaterial({ color: '#c9a640' }), sx - 0.85, 0.95, 1.5, 0.06, 1.9, 0.06);
-    box(new THREE.MeshLambertMaterial({ color: '#c9a640' }), sx + 0.85, 0.95, 1.5, 0.06, 1.9, 0.06);
+    box(litMat({ color: '#c9a640' }), sx - 0.85, 0.95, 1.5, 0.06, 1.9, 0.06);
+    box(litMat({ color: '#c9a640' }), sx + 0.85, 0.95, 1.5, 0.06, 1.9, 0.06);
   }
   // round fitting rug + mirror where the kid stands
-  const rug = new THREE.Mesh(new THREE.CircleGeometry(1.8, 28), new THREE.MeshLambertMaterial({ color: '#8a2a4a' }));
+  const rug = new THREE.Mesh(new THREE.CircleGeometry(1.8, 28), litMat({ color: '#8a2a4a' }));
   rug.rotation.x = -Math.PI / 2; rug.position.set(0, 0.02, 1.2);
   scene.add(rug);
   const rug2 = new THREE.Mesh(new THREE.RingGeometry(1.4, 1.6, 28), new THREE.MeshBasicMaterial({ color: '#e8c64a' }));

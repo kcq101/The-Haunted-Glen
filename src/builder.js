@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { mergeGeometries } from '../lib/addons/utils/BufferGeometryUtils.js';
+import { mergeGeometries, mergeVertices } from '../lib/addons/utils/BufferGeometryUtils.js';
+import { q } from './quality.js';
 
 export const CHUNK = 48;
 
@@ -68,14 +69,23 @@ export class Builder {
   }
 }
 
+function smoothIco(r, detail) {
+  let g = new THREE.IcosahedronGeometry(r, detail);
+  g.deleteAttribute('normal');
+  g.deleteAttribute('uv');
+  g = mergeVertices(g);
+  g.computeVertexNormals();
+  return g;
+}
+
 // --- Shared low-poly shapes ------------------------------------------------
 export const GEO = {
   box: new THREE.BoxGeometry(1, 1, 1),
-  sphere: new THREE.SphereGeometry(0.5, 10, 7),
-  sphereLo: new THREE.IcosahedronGeometry(0.5, 1),
-  cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 10),
+  sphere: new THREE.SphereGeometry(0.5, q(16, 10), q(11, 7)),
+  sphereLo: q(smoothIco(0.5, 2), new THREE.IcosahedronGeometry(0.5, 1)),
+  cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, q(16, 10)),
   cylLo: new THREE.CylinderGeometry(0.5, 0.5, 1, 6),
-  cone: new THREE.ConeGeometry(0.5, 1, 10),
+  cone: new THREE.ConeGeometry(0.5, 1, q(16, 10)),
   cone4: new THREE.ConeGeometry(0.5, 1, 4),
   plane: new THREE.PlaneGeometry(1, 1),
   // triangular prism: base 1 wide (along z), 1 tall, 1 long (along x); base at y=0

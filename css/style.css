@@ -199,3 +199,5 @@ button { font-family: inherit; cursor: pointer; border: none; color: inherit; }
   #swap-name { display: none; }
   .swap-btn { padding: 0 6px; }
 }
+
+.quality-btn { margin-top: 12px; padding: 8px 18px; border-radius: 16px; font-size: 15px; font-weight: 800; background: rgba(255,255,255,0.14); color: #f3e6ff; border: 2px solid rgba(255,255,255,0.25); }

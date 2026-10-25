@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { litMat, HIGH, setQuality } from './quality.js';
 import { CHARACTERS, BOUNDS, px, HOME_ID, STORE } from './config.js';
 import { createTerrain, storePos, setElevation } from './terrain.js';
 import { makeHouseSpecs, groundMarks, buildHouses } from './houses.js';
@@ -27,15 +28,24 @@ function showError(msg) {
   el.classList.remove('hidden');
 }
 
+// Graphics quality toggle on the title screen (reloads to rebuild the world)
+{
+  const qb = $('quality-btn');
+  qb.textContent = HIGH ? '✨ Graphics: High' : '🔋 Graphics: Low (faster)';
+  qb.addEventListener('click', () => setQuality(HIGH ? 'low' : 'high'));
+}
+
 // ---------------------------------------------------------------------------
 // Renderer + world
 // ---------------------------------------------------------------------------
 const canvas = $('world');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: (window.devicePixelRatio || 1) < 2, powerPreference: 'high-performance' });
+// High quality: always antialiased. Low: the original lighter settings.
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: HIGH || (window.devicePixelRatio || 1) < 2, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// PCF honours shadow.radius (set in sky.js) for soft edges at 2048
+renderer.shadowMap.type = HIGH ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -58,7 +68,7 @@ const other = () => (current === 'carter' ? 'jack' : 'carter');
 
 const W = {}; // world bits filled in by buildWorld()
 const mats = {
-  solid: new THREE.MeshLambertMaterial({ vertexColors: true }),
+  solid: litMat({ vertexColors: true }),
   window: new THREE.MeshBasicMaterial({ vertexColors: true }),
   lamp: new THREE.MeshBasicMaterial({ vertexColors: true }),
   shopwin: new THREE.MeshBasicMaterial({ vertexColors: true }),

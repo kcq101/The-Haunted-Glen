@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { litMat } from './quality.js';
 import { ROADS, WOODS, CREEK, TRAIL, STORE, CUL_DE_SAC, px, MAP_SCALE } from './config.js';
 import { fbm, noise2, polylineDistance, pointInPolygon, smoothstep, lerp, chaikin, makeRng } from './util.js';
 
@@ -186,8 +187,33 @@ export function createTerrain(pads, driveways, walkways) {
   geo.setIndex(index);
   geo.computeVertexNormals();
 
+  // Split the ground into tiles that share one set of vertices, so the
+  // renderer can skip tiles that are off screen (same look, far fewer triangles).
+  const TILE = 30; // grid cells per tile side (~48 world units)
+  const tiles = [];
+  for (let tj = 0; tj < rows - 1; tj += TILE) {
+    for (let ti = 0; ti < cols - 1; ti += TILE) {
+      const idx = [];
+      const box = new THREE.Box3();
+      const v = new THREE.Vector3();
+      for (let j = tj; j < Math.min(tj + TILE, rows - 1); j++) {
+        for (let i = ti; i < Math.min(ti + TILE, cols - 1); i++) {
+          const a = j * cols + i, b = a + 1, c = a + cols, d = c + 1;
+          idx.push(a, c, b, b, c, d);
+          for (const k of [a, d]) box.expandByPoint(v.fromArray(pos, k * 3));
+        }
+      }
+      const tg = new THREE.BufferGeometry();
+      for (const name of ['position', 'uv', 'normal']) tg.setAttribute(name, geo.attributes[name]);
+      tg.setIndex(idx);
+      tg.boundingBox = box;
+      tg.boundingSphere = box.getBoundingSphere(new THREE.Sphere());
+      tiles.push(tg);
+    }
+  }
+
   const tex = paintGround(driveways, walkways);
-  const mat = new THREE.MeshLambertMaterial({ map: tex });
+  const mat = litMat({ map: tex });
   // Fine detail tiled on top of the big painted ground so it stays crisp up close
   const detail = makeDetailTexture();
   mat.onBeforeCompile = (shader) => {
@@ -198,9 +224,11 @@ export function createTerrain(pads, driveways, walkways) {
   };
   const group = new THREE.Group();
   group.name = 'terrain';
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.receiveShadow = true;
-  group.add(mesh);
+  for (const tg of tiles) {
+    const mesh = new THREE.Mesh(tg, mat);
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  }
   const street = buildStreetMesh(heightAt, mat);
   street.receiveShadow = true;
   group.add(street);

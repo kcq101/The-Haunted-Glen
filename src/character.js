@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { litMat, q } from './quality.js';
 import { ITEM, outfitTexture } from './costumes.js';
 
 // A cozy, chunky kid built from rounded shapes. Costume pieces snap onto
@@ -20,12 +21,12 @@ export class Kid {
     d.headY = d.shoulderY + d.headR * 0.92;
 
     this.mats = {
-      skin: new THREE.MeshLambertMaterial({ color: cfg.skin }),
-      hair: new THREE.MeshLambertMaterial({ color: cfg.hair }),
-      shirt: new THREE.MeshLambertMaterial({ color: cfg.shirt }),
-      sleeves: new THREE.MeshLambertMaterial({ color: cfg.shirt }),
-      pants: new THREE.MeshLambertMaterial({ color: cfg.pants }),
-      shoes: new THREE.MeshLambertMaterial({ color: cfg.shoes }),
+      skin: litMat({ color: cfg.skin }),
+      hair: litMat({ color: cfg.hair }),
+      shirt: litMat({ color: cfg.shirt }),
+      sleeves: litMat({ color: cfg.shirt }),
+      pants: litMat({ color: cfg.pants }),
+      shoes: litMat({ color: cfg.shoes }),
       eye: new THREE.MeshBasicMaterial({ color: '#1a1410' }),
       white: new THREE.MeshBasicMaterial({ color: '#ffffff' }),
       cheek: new THREE.MeshBasicMaterial({ color: '#f29b8f', transparent: true, opacity: 0.55 }),
@@ -46,7 +47,7 @@ export class Kid {
       if (part) this.bodyParts.push(m);
       return m;
     };
-    const sph = new THREE.SphereGeometry(1, 18, 14);
+    const sph = new THREE.SphereGeometry(1, q(28, 18), q(20, 14));
 
     // legs
     this.legs = [];
@@ -54,14 +55,14 @@ export class Kid {
       const pivot = new THREE.Group();
       pivot.position.set(s * d.torsoR * 0.48, d.hipY, 0);
       body.add(pivot);
-      const legGeo = new THREE.CapsuleGeometry(d.torsoR * 0.42, d.legL * 0.62, 4, 10);
+      const legGeo = new THREE.CapsuleGeometry(d.torsoR * 0.42, d.legL * 0.62, q(6, 4), q(16, 10));
       const leg = add(pivot, legGeo, this.mats.pants, 0, -d.legL * 0.48, 0);
       leg.userData.pants = true;
       add(pivot, sph, this.mats.shoes, 0, -d.legL + d.torsoR * 0.22, d.torsoR * 0.22, d.torsoR * 0.48, d.torsoR * 0.33, d.torsoR * 0.72);
       this.legs.push(pivot);
     }
     // torso
-    const torsoGeo = new THREE.CapsuleGeometry(d.torsoR, d.torsoL * 0.55, 6, 14);
+    const torsoGeo = new THREE.CapsuleGeometry(d.torsoR, d.torsoL * 0.55, q(8, 6), q(22, 14));
     this.torso = add(body, torsoGeo, this.mats.shirt, 0, d.hipY + d.torsoL * 0.5, 0, 1.12, 1, 0.86);
     // arms
     this.arms = [];
@@ -70,7 +71,7 @@ export class Kid {
       pivot.position.set(s * d.torsoR * 1.18, d.shoulderY - d.torsoR * 0.35, 0);
       pivot.rotation.z = s * 0.12;
       body.add(pivot);
-      const armGeo = new THREE.CapsuleGeometry(d.torsoR * 0.34, d.torsoL * 0.7, 4, 10);
+      const armGeo = new THREE.CapsuleGeometry(d.torsoR * 0.34, d.torsoL * 0.7, q(6, 4), q(16, 10));
       add(pivot, armGeo, this.mats.sleeves, 0, -d.torsoL * 0.42, 0);
       const hand = add(pivot, sph, this.mats.skin, 0, -d.torsoL * 0.92, 0, d.torsoR * 0.36, d.torsoR * 0.38, d.torsoR * 0.36);
       this.arms.push(pivot);
@@ -96,7 +97,7 @@ export class Kid {
       add(head, sph, this.mats.cheek, s * r * 0.55, -r * 0.27, r * 0.74, r * 0.14, r * 0.09, r * 0.05);
       this.eyes.push(e);
     }
-    const smile = new THREE.Mesh(new THREE.TorusGeometry(r * 0.16, r * 0.035, 6, 12, Math.PI), this.mats.mouth);
+    const smile = new THREE.Mesh(new THREE.TorusGeometry(r * 0.16, r * 0.035, 8, q(20, 12), Math.PI), this.mats.mouth);
     smile.position.set(0, -r * 0.3, r * 0.9);
     smile.rotation.set(0.25, 0, Math.PI);
     head.add(smile);

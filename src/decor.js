@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { litMat } from './quality.js';
 import { GEO } from './builder.js';
 import { makeRng, polylineDistance, resample } from './util.js';
 import { toWorld } from './houses.js';
@@ -242,10 +243,10 @@ export function addTrail(B, glows, scene, heightAt) {
   const sx = start.x - (tdz / tl) * 3.2, sz = start.z + (tdx / tl) * 3.2, sy = heightAt(sx, sz);
   B.add(GEO.box, '#5a3d26', { x: sx, y: sy + 1.5, z: sz, sx: 0.22, sy: 3.0, sz: 0.22 });
   const sign = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.2, 0.12), [
-    new THREE.MeshLambertMaterial({ color: '#5a3d26' }), new THREE.MeshLambertMaterial({ color: '#5a3d26' }),
-    new THREE.MeshLambertMaterial({ color: '#5a3d26' }), new THREE.MeshLambertMaterial({ color: '#5a3d26' }),
-    new THREE.MeshLambertMaterial({ map: textTexture(['Hares Hill', 'Halloween Emporium ➜'], { font: 'bold 50px Georgia, serif' }) }),
-    new THREE.MeshLambertMaterial({ map: textTexture(['Hares Hill', 'Halloween Emporium ➜'], { font: 'bold 50px Georgia, serif' }) }),
+    litMat({ color: '#5a3d26' }), litMat({ color: '#5a3d26' }),
+    litMat({ color: '#5a3d26' }), litMat({ color: '#5a3d26' }),
+    litMat({ map: textTexture(['Hares Hill', 'Halloween Emporium ➜'], { font: 'bold 50px Georgia, serif' }) }),
+    litMat({ map: textTexture(['Hares Hill', 'Halloween Emporium ➜'], { font: 'bold 50px Georgia, serif' }) }),
   ]);
   sign.position.set(sx, sy + 2.5, sz);
   sign.rotation.y = Math.atan2(tdx, tdz);
@@ -307,7 +308,7 @@ export function hauntHome(B, glows, scene, s, heightAt) {
     const [lx, lz] = graves[i];
     const p = W(lx, s.D / 2 + lz - 2);
     const tex = textTexture(lines, { w: 256, h: 256, bg: '#8e9196', fg: '#3a3c40', border: '#6f7276', font: 'bold 48px Georgia, serif' });
-    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 0.8), new THREE.MeshLambertMaterial({ map: tex }));
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 0.8), litMat({ map: tex }));
     const c = Math.cos(s.rot), sn = Math.sin(s.rot);
     plate.position.set(p.x + sn * 0.1 * 1.1, p.y + 0.52 * 1.1, p.z + c * 0.1 * 1.1);
     plate.rotation.y = s.rot;
@@ -365,7 +366,7 @@ export function hauntHome(B, glows, scene, s, heightAt) {
   const anim = new THREE.Group();
   scene.add(anim);
   const ghost = new THREE.Group();
-  const gm = new THREE.MeshLambertMaterial({ color: '#f4f6ff', emissive: '#6a6aa0', transparent: true, opacity: 0.92 });
+  const gm = litMat({ color: '#f4f6ff', emissive: '#6a6aa0', transparent: true, opacity: 0.92 });
   const gb = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), gm);
   gb.scale.set(1.1, 1.4, 1.0);
   ghost.add(gb);
@@ -388,7 +389,7 @@ export function hauntHome(B, glows, scene, s, heightAt) {
   anim.add(ghost);
 
   const bats = [];
-  const batMat = new THREE.MeshLambertMaterial({ color: '#1b1520', side: THREE.DoubleSide });
+  const batMat = litMat({ color: '#1b1520', side: THREE.DoubleSide });
   for (let i = 0; i < 7; i++) {
     const b = new THREE.Group();
     b.add(new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), batMat));

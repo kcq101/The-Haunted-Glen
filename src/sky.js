@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { DAY_CYCLE_SECONDS } from './config.js';
 import { clamp } from './util.js';
+import { HIGH } from './quality.js';
 
 // Morning -> noon -> afternoon -> golden hour -> sunset -> night -> dawn.
 // az = sun direction around the horizon (0 = east, -90 = south, -180 = west).
@@ -39,7 +40,8 @@ export class DayNight {
 
     this.sun = new THREE.DirectionalLight('#ffffff', 2);
     this.sun.castShadow = true;
-    this.sun.shadow.mapSize.set(1024, 1024);
+    this.sun.shadow.mapSize.set(HIGH ? 2048 : 1024, HIGH ? 2048 : 1024);
+    if (HIGH) this.sun.shadow.radius = 3;
     const sc = this.sun.shadow.camera;
     sc.left = -34; sc.right = 34; sc.top = 34; sc.bottom = -34; sc.near = 1; sc.far = 220;
     this.sun.shadow.bias = -0.0006;

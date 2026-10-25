@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { litMat } from './quality.js';
 
 // ---------------------------------------------------------------------------
 // Costume catalog for the Hares Hill Halloween Emporium.
@@ -19,7 +20,7 @@ export function mat(color, opts = {}) {
   const key = color + JSON.stringify(opts);
   if (!matCache.has(key)) {
     const m = opts.basic ? new THREE.MeshBasicMaterial({ color, ...opts.params })
-      : new THREE.MeshLambertMaterial({ color, ...(opts.params || {}) });
+      : litMat({ color, ...(opts.params || {}) });
     matCache.set(key, m);
   }
   return matCache.get(key);
@@ -116,7 +117,7 @@ const TEX = {
 
 // glow material for pumpkin faces, lanterns, etc.
 const glowMat = new THREE.MeshBasicMaterial({ color: '#ffb340' });
-const glassMat = new THREE.MeshLambertMaterial({ color: '#cfe8ff', transparent: true, opacity: 0.28, depthWrite: false });
+const glassMat = litMat({ color: '#cfe8ff', transparent: true, opacity: 0.28, depthWrite: false });
 
 // --- catalog ----------------------------------------------------------------
 // build(d) returns [{ anchor, obj }]. Anchors: head (head center), hand (right
