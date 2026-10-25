@@ -425,14 +425,14 @@ function paintGround(driveways, walkways) {
   fillCircle(ctx, culDeSac, culDeSac.r + 1.6, stripPat);
 
   // Driveways and front walkways cross the sidewalk
-  // driveways: halfway between the sidewalk concrete and the street asphalt,
+  // driveways: mostly street asphalt with a bit of sidewalk concrete mixed in,
   // with a little speckle like the road
   const drive = makeTile(64, (c, sz) => {
-    c.fillStyle = '#8a8a88';
+    c.fillStyle = '#6a6c6e';
     c.fillRect(0, 0, sz, sz);
     for (let i = 0; i < 400; i++) {
-      const g = 118 + Math.random() * 40;
-      c.fillStyle = `rgb(${g},${g},${g - 2})`;
+      const g = 92 + Math.random() * 32;
+      c.fillStyle = `rgb(${g},${g + 1},${g + 3})`;
       c.fillRect(Math.random() * sz, Math.random() * sz, 1, 1);
     }
   });
