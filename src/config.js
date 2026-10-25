@@ -108,18 +108,21 @@ export const STORE = { x: 752, y: 932, facing: -Math.PI * 0.75 }; // up on the e
 // facing: direction the front door faces. 'S' = toward the bottom of the map.
 export const HOME_ID = 'h1018';
 export const HOUSES = [
-  // North row (backs onto Snyder Ave), front doors face the street to the south
+  // North row (backs onto Snyder Ave), front doors face the street to the south.
+  // Garages on the right (seen from the street), except the corner house and
+  // the last two on the cul-de-sac, which have them on the left.
+  // (garage: 1 = right side seen from the street, -1 = left side)
   // Corner house next door: angled toward the bend in the road, white with a
   // dark roof and a stone lower story (from the 1015 Iron Works street view)
   { id: 'h1022', x: 146, y: 474, facing: 'SE', garage: -1,
     style: { siding: '#f3f2ee', roof: '#3a3e43', door: '#24282b', stone: '#a8937a', stoneBand: true, frontGable: true, porch: true, chimney: false, shutters: false, W: 12.4, D: 9.6, H: 6.2 } },
   { id: HOME_ID, x: 226, y: 462, facing: 'S', home: true },
   { id: 'h1014', x: 307, y: 460, facing: 'S', garage: 1 },
-  { id: 'h1010', x: 390, y: 457, facing: 'S' },
-  { id: 'h1006', x: 466, y: 455, facing: 'S' },
-  { id: 'h1002', x: 556, y: 455, facing: 'S' },
-  { id: 'h1000', x: 650, y: 440, facing: 'S' },
-  { id: 'h0998', x: 733, y: 440, facing: 'SW' },
+  { id: 'h1010', x: 390, y: 457, facing: 'S', garage: 1 },
+  { id: 'h1006', x: 466, y: 455, facing: 'S', garage: 1 },
+  { id: 'h1002', x: 556, y: 455, facing: 'S', garage: 1 },
+  { id: 'h1000', x: 650, y: 440, facing: 'S', garage: -1 },
+  { id: 'h0998', x: 733, y: 440, facing: 'SW', garage: -1 },
   // Cul-de-sac, south side
   { id: 'h1001', x: 508, y: 592, facing: 'N' },
   { id: 'h1003', x: 595, y: 590, facing: 'N' },
@@ -133,7 +136,9 @@ export const HOUSES = [
   { id: 'h1017', x: 276, y: 860, facing: 'W' },
   { id: 'h1019', x: 272, y: 940, facing: 'W' },
   // Inner block, facing Brinell (east)
-  { id: 'b100', x: 382, y: 602, facing: 'E' },
+  // Corner of Brinell and Iron Works: faces Iron Works (north), garage on the
+  // left with the driveway out to Iron Works
+  { id: 'b100', x: 382, y: 590, facing: 'N', garage: -1, street: 'Iron Works Rd' },
   { id: 'b102', x: 384, y: 682, facing: 'E' },
   { id: 'b104', x: 386, y: 770, facing: 'E' },
   { id: 'b106', x: 384, y: 852, facing: 'E' },

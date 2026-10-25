@@ -17,10 +17,11 @@ function toWorld(spec, lx, lz) {
   return { x: spec.x + lx * c + lz * s, z: spec.z - lx * s + lz * c };
 }
 
-function nearestRoad(p) {
+function nearestRoad(p, only) {
   let best = null;
   for (const r of roadLines) {
     if (r.name === 'Snyder Ave' || r.name === 'Crossover Blvd') continue;
+    if (only && r.name !== only) continue;
     const n = polylineDistance(p.x, p.z, r.line);
     if (!best || n.d < best.d) best = { ...n, width: r.width };
   }
@@ -82,7 +83,7 @@ export function makeHouseSpecs() {
     const garageFront = spec.home
       ? toWorld(spec, spec.gx + spec.garageSide * (spec.gw / 2 + 1.6), spec.D / 2 - 2)
       : toWorld(spec, spec.gx, spec.gz + spec.gd / 2 + 0.2);
-    const road = nearestRoad(garageFront);
+    const road = nearestRoad(garageFront, h.street);
     spec.driveway = { a: garageFront, b: { x: road.x, z: road.z }, width: spec.home ? 4.4 : 5.4 };
     if (spec.home) {
       // the real driveway runs up the right side to a side-load garage
@@ -90,7 +91,7 @@ export function makeHouseSpecs() {
       spec.driveway.mid = toWorld(spec, spec.gx + spec.garageSide * (spec.gw / 2 + 2.2), spec.D / 2 + 2);
     }
     const doorPt = toWorld(spec, spec.doorX, spec.D / 2 + 0.6);
-    const roadDoor = nearestRoad(doorPt);
+    const roadDoor = nearestRoad(doorPt, h.street);
     const dx = doorPt.x - roadDoor.x, dz = doorPt.z - roadDoor.z;
     const dl = Math.hypot(dx, dz) || 1;
     const off = roadDoor.width / 2 + 2.6;
