@@ -20,6 +20,7 @@ export const culDeSac = { ...px(CUL_DE_SAC.x, CUL_DE_SAC.y), r: CUL_DE_SAC.r * M
 export const storePos = px(STORE.x, STORE.y);
 
 const northRoadZ = px(0, 525).z;
+const NORTH_RISE_CUT = 0.5; // 0 = real height, 0.5 = half as high above the street
 const ourHollow = px(176, 488);
 const haresHill = px(760, 940);
 
@@ -58,6 +59,14 @@ function natural(x, z) {
     h -= 0.9 * (1 - smoothstep(0.8, 3.2, c));
     const dhh = Math.hypot(x - haresHill.x, z - haresHill.z);
     h += 1.6 * Math.exp(-((dhh / 14) ** 2));
+    // The north-side houses sit up above Iron Works; this halves how far they
+    // rise above the street (fading out again toward Snyder Ave behind them)
+    const north = smoothstep(northRoadZ - 1, northRoadZ - 6, z) * (1 - smoothstep(px(0, 400).z, px(0, 372).z, z))
+      * smoothstep(px(178, 0).x, px(196, 0).x, x) * (1 - smoothstep(px(690, 0).x, px(740, 0).x, x)); // not the white corner house
+    if (north > 0) {
+      const street = lidar(x, northRoadZ);
+      if (h > street) h = street + (h - street) * (1 - NORTH_RISE_CUT * north); // only lower, never sink
+    }
     return h;
   }
   let h = 0;
