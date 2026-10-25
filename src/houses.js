@@ -83,7 +83,7 @@ export function makeHouseSpecs() {
     if (h.walkout) {
       // ground drops a full story from the front of the house to the back yard
       spec.walkout = WALKOUT_DROP;
-      spec.pad.walkout = { drop: WALKOUT_DROP, depth: spec.D, yard: 9 };
+      spec.pad.walkout = { drop: WALKOUT_DROP, minDrop: 2.25, maxDrop: WALKOUT_DROP, depth: spec.D, yard: 9 };
     }
 
     const garageFront = spec.home
@@ -318,7 +318,7 @@ function addSlider(B, M, x, y0, z, w) {
 // Walkout basement (house built up above the back yard) with a raised
 // deck off the main floor: posts, white railings and stairs down to the yard.
 function addWalkout(B, s, M) {
-  const { W, D } = s, drop = s.walkout;
+  const { W, D } = s, drop = s.pad.walkout.drop; // set by the terrain from the real slope
   const back = -D / 2;
   // basement walls in siding, 4 cm proud of the foundation so they never flicker
   B.add(GEO.box, s.siding, { y: (-0.05 - drop - 0.5) / 2, sx: W + 0.38, sy: drop + 0.45, sz: D + 0.38 }, 'solid', M);
