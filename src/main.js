@@ -64,6 +64,7 @@ const save = loadSave();
 const kids = { carter: new Kid(CHARACTERS.carter), jack: new Kid(CHARACTERS.jack) };
 kids.carter.setCostume(save.outfits.carter);
 kids.jack.setCostume(save.outfits.jack);
+for (const k of Object.values(kids)) if (k.cfg.model) k.loadModel(k.cfg.model);
 let current = save.current in kids ? save.current : 'carter';
 const other = () => (current === 'carter' ? 'jack' : 'carter');
 

@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { litMat, q } from './quality.js';
 import { ITEM, outfitTexture } from './costumes.js';
+import { MeshyBody } from './meshykid.js';
 
 // A cozy, chunky kid built from rounded shapes. Costume pieces snap onto
-// anchors (head, hand, shoulder, back, waist, neck). This is the stand-in
-// until the Meshy models are ready.
+// anchors (head, hand, shoulder, back, waist, neck). This is the stand-in;
+// loadModel() swaps in the boy's Meshy model once it has downloaded and keeps
+// the stand-in if it can't load.
 export class Kid {
   constructor(cfg) {
     this.cfg = cfg;
@@ -121,8 +123,10 @@ export class Kid {
       back: new THREE.Group(),
       waist: new THREE.Group(),
       neck: new THREE.Group(),
+      face: new THREE.Group(), // face pieces (eye level); same as head on the stand-in
       root,
     };
+    head.add(this.anchors.face);
     this.anchors.shoulder.position.set(-d.torsoR * 1.05, d.shoulderY + d.torsoR * 0.05, 0);
     this.anchors.back.position.set(0, d.shoulderY + d.torsoR * 0.1, -d.torsoR * 0.85);
     this.anchors.waist.position.set(0, d.hipY + d.torsoR * 0.15, 0);
@@ -138,6 +142,23 @@ export class Kid {
     this.jumpY = 0;
   }
 
+  async loadModel(url) {
+    try {
+      const m = await MeshyBody.load(url, this.cfg.height);
+      this.model = m;
+      this.body.add(m.root);
+      this.d = m.d; // costumes size themselves to the real boy
+      this.body.add(this.handAnchor); // follows the hand bone now, not the stand-in arm
+      this.anchors.face.position.y = m.d.faceDY;
+      m.bindAnchors(this.anchors, this.body);
+      this.setCostume(this.costume);
+      return true;
+    } catch (e) {
+      console.warn(`Couldn't load ${url}, keeping the stand-in kid`, e);
+      return false;
+    }
+  }
+
   setCostume(costume) {
     this.costume = { ...costume };
     for (const o of this.costumeObjs) o.parent && o.parent.remove(o);
@@ -150,8 +171,14 @@ export class Kid {
     this.mats.pants.color.set(c.pants); this.mats.pants.map = null;
     this.mats.shoes.color.set(c.shoes);
     for (const k of ['shirt', 'pants']) this.mats[k].needsUpdate = true;
-    this.bodyParts.forEach((m) => (m.visible = true));
-    this.hair.visible = true;
+    const proc = !this.model;
+    this.bodyParts.forEach((m) => (m.visible = proc));
+    this.hair.visible = proc;
+    if (this.model) {
+      this.model.root.visible = true;
+      this.model.hideHead = false;
+      this.model.setOutfit(null);
+    }
 
     const outfit = costume.outfit && ITEM[costume.outfit];
     if (outfit?.colors) {
@@ -165,6 +192,7 @@ export class Kid {
       if (oc.pantsTex) this.mats.pants.color.set('#ffffff');
       this.mats.shirt.needsUpdate = true;
       this.mats.pants.needsUpdate = true;
+      if (this.model) this.model.setOutfit(oc, outfitTexture);
     }
     let hideBody = false;
     for (const slot of ['outfit', 'hat', 'face', 'prop']) {
@@ -172,10 +200,13 @@ export class Kid {
       if (!item) continue;
       if (hideBody && slot === 'face') continue;
       for (const part of item.build(this.d)) {
-        const anchor = this.anchors[part.anchor] || this.anchors.head;
+        const name = slot === 'face' && part.anchor === 'head' ? 'face' : part.anchor;
+        const anchor = this.anchors[name] || this.anchors.head;
         anchor.add(part.obj);
         this.costumeObjs.push(part.obj);
         part.obj.traverse((o) => { if (o.userData.blink || o.userData.bob || o.userData.flap || o.userData.spin || o.userData.cape) this.animated.push(o); });
+        if (part.hideHead && this.model) this.model.hideHead = true;
+        if (part.hideBody && this.model) this.model.root.visible = false;
         if (part.hideHead) { this.headMesh.visible = false; this.hair.visible = false; this.eyes.forEach((e) => (e.visible = false)); }
         if (part.hideBody) {
           hideBody = true;
@@ -190,6 +221,18 @@ export class Kid {
     const target = moving ? speed01 : 0;
     this.speed += (target - this.speed) * Math.min(1, dt * 10);
     this.walkPhase += dt * (6 + this.speed * 7) * (this.speed > 0.05 ? 1 : 0);
+    if (this.model) {
+      this.model.update(dt, this.speed);
+      if (this.jumpY > 0 || this.jumpV > 0) {
+        this.jumpV -= 18 * dt;
+        this.jumpY = Math.max(0, this.jumpY + this.jumpV * dt);
+        if (this.jumpY === 0) this.jumpV = 0;
+      }
+      this.body.position.y = this.jumpY;
+      this.model.syncAnchors();
+      this.animateCostume(time);
+      return;
+    }
     const sw = Math.sin(this.walkPhase) * 0.75 * this.speed;
     this.legs[0].rotation.x = sw;
     this.legs[1].rotation.x = -sw;
@@ -210,7 +253,10 @@ export class Kid {
     const blink = this.blinkT < 0.12;
     if (this.blinkT < 0) this.blinkT = 2 + Math.random() * 3;
     this.eyes.forEach((e) => (e.scale.y = blink ? this.d.headR * 0.02 : this.d.headR * 0.17));
-    // costume animation
+    this.animateCostume(time);
+  }
+
+  animateCostume(time) {
     for (const o of this.animated || []) {
       if (o.userData.blink) o.visible = Math.sin(time * 6) > -0.3;
       if (o.userData.bob) o.position.y = Math.sin(time * 3) * 0.02;

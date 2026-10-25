@@ -21,13 +21,14 @@ export const BOUNDS = { minX: 20, maxX: 795, minY: 392, maxY: 1285 };
 export const DAY_CYCLE_SECONDS = 720;
 
 // --- Characters -----------------------------------------------------------
-// Tweak these to make the boys look like themselves until the Meshy models
-// arrive. Drop rigged models at assets/models/carter.glb / jack.glb later.
+// The boys are Meshy models (model:). The colors below dress the simple
+// stand-in kid that shows while a model loads or if it can't load.
 export const CHARACTERS = {
   carter: {
     name: 'Carter',
     age: 7,
     height: 1.3,
+    model: 'assets/models/carter.glb',
     skin: '#f2c7a5',
     hair: '#6b4426',
     hairStyle: 'short',
@@ -41,6 +42,7 @@ export const CHARACTERS = {
     name: 'Jack',
     age: 4,
     height: 1.06,
+    model: 'assets/models/jack.glb',
     skin: '#f4ccad',
     hair: '#9a6a3c',
     hairStyle: 'shaggy',

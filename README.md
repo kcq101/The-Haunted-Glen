@@ -41,7 +41,8 @@ src/sky.js            golden hour / night cycle
 src/backdrop.js       the world beyond: farm fields, barns and hazy hills on the horizon
 src/store.js          Hares Hill Emporium (outside, inside, and Hazel)
 src/costumes.js       costume catalog (add new items here)
-src/character.js      the kids' 3D models + costume anchors
+src/character.js      the kids + costume anchors (stand-in body until the model loads)
+src/meshykid.js       loads the Meshy boys: animation, bone anchors, outfit recolor
 src/haunted2d.js      the 2D haunted house
 src/audio.js          sound effects (synthesized, no files needed)
 lib/                  three.js r170 (bundled so it works offline)
@@ -52,7 +53,7 @@ Everything on the map is placed using pixel positions from the aerial screenshot
 
 ## Coming next / how to plug in assets
 
-- **Meshy models:** drop rigged models at `assets/models/carter.glb` and `assets/models/jack.glb`. The loader and costume anchor hookup is the next step.
+- **Meshy models:** Carter and Jack are the rigged Meshy models in `assets/models/` (`src/meshykid.js`). They play idle, walk and run, costume pieces ride on the head, hand and spine bones, and outfits recolor the shirt, sleeves, pants and shoes. To swap in a new model, export from Meshy with animations as `.glb`, shrink the textures to 1024 px, and replace the file. The simple stand-in kid shows while a model downloads.
 - **GPT sprites for the haunted house:** pixel tiles at 16 px (32 px also fine). They'll replace the draw functions in `src/haunted2d.js`.
 - **Theme music:** put an mp3 at `assets/music/theme.mp3`, and it plays automatically on a loop.
 
