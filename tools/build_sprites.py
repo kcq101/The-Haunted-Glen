@@ -274,6 +274,23 @@ def spots(c, a, cls, direction):
     band[top + int(h * 0.18): top + int(h * 0.42)] = True
     eyes = np.nonzero(dark & inner & band)
     eye_y = int(np.median(eyes[0])) if direction != 'up' and len(eyes[0]) >= 2 else top + int(h * 0.3)
+    # eye pixels (for blinking): small dark blobs in the face band
+    eye_rects = []
+    if direction != 'up':
+        L = f.mean(2)
+        eyeish = (L < 60) | ((L < 125) & (f[..., 2] > 0.5 * f[..., 0]))  # dark or grayish-brown, unlike orange hair
+        lab, n = ndi.label(eyeish & a & inner & band)
+        blobs = []
+        for sl in ndi.find_objects(lab):
+            bh, bw = sl[0].stop - sl[0].start, sl[1].stop - sl[1].start
+            if bh <= 4 and bw <= 3:
+                blobs.append((bh * bw, [sl[1].start, sl[0].start, bw, bh]))
+        hc = (hx0 + hx1) / 2
+        if direction == 'right':
+            blobs = [b for b in blobs if b[1][0] + b[1][2] / 2 > hc]
+        elif direction == 'left':
+            blobs = [b for b in blobs if b[1][0] + b[1][2] / 2 < hc]
+        eye_rects = [r for _, r in sorted(blobs, reverse=True)[:2 if direction == 'down' else 1]]
     sh = np.nonzero(cls == SHIRT)
     if len(sh[0]):
         torso = [int(sh[1].min()), int(sh[0].min()), int(sh[1].max()) + 1, int(sh[0].max()) + 1]
@@ -290,7 +307,7 @@ def spots(c, a, cls, direction):
         hand = [int(cand[1][i]), int(cand[0][i]) + torso[1]]
     else:
         hand = [torso[2], torso[3]]
-    return {'top': top, 'head': [hx0, hx1], 'eye': eye_y, 'torso': torso, 'hand': hand}
+    return {'top': top, 'head': [hx0, hx1], 'eye': eye_y, 'torso': torso, 'hand': hand, 'eyes': eye_rects}
 
 
 def pack(kid, frames, idle):
@@ -310,6 +327,11 @@ def pack(kid, frames, idle):
     atlas = np.zeros((ch * len(order), cw * ncol, 4), np.uint8)
     mask = np.zeros_like(atlas)
     meta = {'cell': [cw, ch], 'foot': [cw // 2, ch - 1], 'anims': {}, 'idle': idle}
+    c0, a0 = frames['down'][idle['down']]
+    f0 = c0.astype(int)
+    sk = a0 & (f0[..., 0] > 170) & (f0[..., 0] - f0[..., 2] > 70) & (f0[..., 1] > 0.6 * f0[..., 0])
+    sk[int(a0.shape[0] * 0.5):] = False
+    meta['lid'] = '#%02x%02x%02x' % tuple(np.percentile(f0[sk], 65, axis=0).astype(int)) if sk.any() else '#f4b48c'
     colors = {SHIRT: (255, 0, 0), PANTS: (0, 255, 0), SHOES: (0, 0, 255)}
     for ri, d in enumerate(order):
         meta['anims'][d] = []
@@ -333,6 +355,7 @@ def pack(kid, frames, idle):
                 'eye': rel(0, sp['eye'])[1],
                 'torso': rel(sp['torso'][0], sp['torso'][1]) + rel(sp['torso'][2], sp['torso'][3]),
                 'hand': rel(*sp['hand']),
+                'eyes': [rel(x, y) + [w, h] for x, y, w, h in sp['eyes']],
             })
     Image.fromarray(atlas, 'RGBA').save(os.path.join(OUT, f'{kid}.png'), optimize=True)
     Image.fromarray(mask, 'RGBA').save(os.path.join(OUT, f'{kid}_mask.png'), optimize=True)

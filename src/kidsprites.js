@@ -63,6 +63,20 @@ function dressed(id, L) {
   return c;
 }
 
+const blinkState = {};
+export const spriteDebug = { forceBlink: false }; // used by tools/sprite_preview.html
+function blinking(id) {
+  if (spriteDebug.forceBlink) return true;
+  const now = performance.now() / 1000;
+  const b = (blinkState[id] ||= { next: now + 1 + Math.random() * 3, until: 0, again: false });
+  if (now >= b.next) {
+    b.until = now + 0.14;
+    b.again = Math.random() < 0.2;
+    b.next = b.again ? now + 0.3 : now + 2.5 + Math.random() * 3.5;
+  }
+  return now < b.until;
+}
+
 // Draw the kid with feet at (cx, fy). Returns false if no sprite (use fallback).
 export function drawSpriteKid(g, cx, fy, dir, moving, anim, L, D) {
   const id = L.id;
@@ -94,6 +108,13 @@ export function drawSpriteKid(g, cx, fy, dir, moving, anim, L, D) {
 
   const row = DIRS.indexOf(dir);
   g.drawImage(dressed(id, L), F.x, row * ch, cw, ch, ox, oy, cw, ch);
+  // blink every few seconds (eyes are a couple of dark pixels: cover with skin + a lash line)
+  if (F.eyes && blinking(id) && L.face !== 'skull_mask') {
+    for (const [ex0, ey0, ew, eh] of F.eyes) {
+      D.rect(g, X + ex0, Y + ey0, ew, eh, M.lid);
+      D.rect(g, X + ex0, Y + ey0 + eh - 1, ew, 1, '#3a2418');
+    }
+  }
 
   // outfit details on the shirt
   const tw = tx1 - tx0, th = ty1 - ty0, front = dir !== 'up';

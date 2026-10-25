@@ -144,7 +144,7 @@ export class Kid {
 
   async loadModel(url) {
     try {
-      const m = await MeshyBody.load(url, this.cfg.height);
+      const m = await MeshyBody.load(url, this.cfg.height, this.cfg);
       this.model = m;
       this.body.add(m.root);
       this.d = m.d; // costumes size themselves to the real boy

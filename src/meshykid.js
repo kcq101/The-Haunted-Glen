@@ -32,12 +32,13 @@ function regionOf(bone) {
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
 export class MeshyBody {
-  static async load(url, height) {
+  static async load(url, height, cfg = {}) {
     const gltf = await loadGLB(url);
-    return new MeshyBody(gltf, height);
+    return new MeshyBody(gltf, height, cfg);
   }
 
-  constructor(gltf, height) {
+  constructor(gltf, height, cfg = {}) {
+    this.cfg = cfg;
     // each kid gets its own copy (the cache may be shared)
     const src = gltf.scene;
     this.root = src.userData.used ? cloneSkinned(src) : src;
@@ -123,6 +124,11 @@ export class MeshyBody {
       uTorsoY: { value: new THREE.Vector2(...this.torsoY) },
       uLegY: { value: new THREE.Vector2(...this.legY) },
       uLegX: { value: this.legX },
+      // blinking: the face is painted on, so a lid + lash line is painted over each eye
+      uBlink: { value: 0 },
+      uEye0: { value: new THREE.Vector4(...(this.cfg.eyeUV?.[0] || [0, 0, 0, 0])) },
+      uEye1: { value: new THREE.Vector4(...(this.cfg.eyeUV?.[1] || [0, 0, 0, 0])) },
+      uLid: { value: new THREE.Color(this.cfg.lid || '#f6b48c') },
     });
     const blank = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
     blank.needsUpdate = true;
@@ -137,8 +143,23 @@ export class MeshyBody {
         .replace('#include <common>', `#include <common>
 varying vec4 vRegion; varying vec3 vRest;
 uniform vec4 uOn; uniform vec3 uShirt, uSleeve, uPants, uShoes;
-uniform sampler2D uShirtTex, uPantsTex; uniform vec2 uHasTex, uTorsoY, uLegY; uniform float uLegX;`)
+uniform sampler2D uShirtTex, uPantsTex; uniform vec2 uHasTex, uTorsoY, uLegY; uniform float uLegX;
+uniform float uBlink; uniform vec4 uEye0, uEye1; uniform vec3 uLid;
+void blinkEye(inout vec3 col, vec2 uv, vec4 E) {
+  vec2 q = (uv - E.xy) / E.zw;          // -1..1 across the eye; -y is the top of the eye
+  float r2 = dot(q, q);
+  if (r2 >= 1.0) return;
+  float edge = mix(-1.05, 0.3, uBlink) + 0.18 * (1.0 - q.x * q.x) * uBlink; // lid edge curves down
+  float lid = (1.0 - smoothstep(0.75, 1.0, r2)) * step(q.y, edge);
+  vec3 skin = uLid * (0.9 + 0.08 * (q.y - edge + 1.0));
+  col = mix(col, skin, lid);
+  float lash = (1.0 - smoothstep(0.06, 0.13, abs(q.y - edge))) * step(abs(q.x), 0.92) * step(0.25, uBlink);
+  col = mix(col, vec3(0.05, 0.025, 0.015), lash * (1.0 - smoothstep(0.85, 1.0, r2)));
+}`)
         .replace('#include <map_fragment>', `#include <map_fragment>
+#ifdef USE_MAP
+if (uBlink > 0.0) { blinkEye(diffuseColor.rgb, vMapUv, uEye0); blinkEye(diffuseColor.rgb, vMapUv, uEye1); }
+#endif
 if (dot(uOn, vec4(1.0)) > 0.0) {
   vec3 c = pow(max(diffuseColor.rgb, vec3(1e-4)), vec3(1.0 / 2.2));
   float gr = c.g / c.r, br = c.b / c.r;
@@ -239,8 +260,30 @@ if (dot(uOn, vec4(1.0)) > 0.0) {
     if (walk) { walk.setEffectiveWeight(move * (1 - r)); walk.timeScale = 0.75 + speed01 * 0.9; }
     if (run) { run.setEffectiveWeight(move * r); run.timeScale = 0.8 + speed01 * 0.35; }
     this.mixer.update(dt);
+    this._blink(dt);
     if (this.hideHead) this.bones.Head.scale.setScalar(0.001);
     else this.bones.Head.scale.setScalar(1);
+  }
+
+  // a blink every few seconds, sometimes a double blink
+  _blink(dt) {
+    if (!this.cfg.eyeUV) return;
+    if (this.blinkWait === undefined) this.blinkWait = 1 + Math.random() * 3;
+    this.blinkWait -= dt;
+    if (this.blinkWait <= 0) {
+      this.blinkWait = 2.5 + Math.random() * 3.5;
+      this.blinkAt = 0;
+      this.blinkTimes = Math.random() < 0.2 ? 2 : 1;
+    }
+    let v = 0;
+    if (this.blinkAt !== undefined && this.blinkAt >= 0) {
+      const D = 0.16, GAP = 0.08;
+      this.blinkAt += dt;
+      const p = this.blinkAt % (D + GAP);
+      if (p < D) v = Math.min(1, Math.sin((p / D) * Math.PI) * 1.4);
+      if (this.blinkAt > this.blinkTimes * (D + GAP)) this.blinkAt = -1;
+    }
+    this.uniforms.uBlink.value = v;
   }
 
   // --- body measurements for costumes (same fields as the stand-in kid) ------
