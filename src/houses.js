@@ -192,13 +192,16 @@ function buildOne(B, s, M) {
   // metal accent roof over first floor of the bay (like the real house)
   if (s.home) B.add(GEO.box, '#2e3236', { y: H / 2 + 0.25, z: D / 2 + 0.75, rx: 0.5, sx: bayW + 0.3, sy: 0.12, sz: 0.9 }, 'solid', M);
 
-  // door + steps + light
-  const dz = D / 2 + (bayOut ? 0.5 : s.stoneBand ? 0.2 : 0.05);
-  B.add(GEO.box, TRIM, { x: s.doorX, y: 1.25, z: dz + 0.02, sx: 1.7, sy: 2.6, sz: 0.1 }, 'solid', M);
-  B.add(GEO.box, s.door, { x: s.doorX, y: 1.15, z: dz + 0.07, sx: 1.05, sy: 2.25, sz: 0.08 }, 'solid', M);
-  B.add(GEO.box, '#ffd27a', { x: s.doorX + 0.32, y: 1.12, z: dz + 0.13, sx: 0.08, sy: 0.08, sz: 0.06 }, 'solid', M);
-  // sidelights
-  for (const side of [-1, 1]) B.add(GEO.box, '#ffffff', { x: s.doorX + side * 0.68, y: 1.25, z: dz + 0.06, sx: 0.22, sy: 1.9, sz: 0.04 }, 'window', M);
+  // door + steps + light. Everything is layered at least 4 cm apart in front
+  // of the actual wall face (stone or siding) so nothing z-fights/flickers.
+  const lowerStone = !!(s.stone && !s.stoneBand && !s.frontGable);
+  const stoneFace = 0.17; // stone veneer sticks out this far from the siding
+  const dz = D / 2 + (bayOut ? 0.5 : s.stoneBand || lowerStone ? stoneFace : 0);
+  B.add(GEO.box, TRIM, { x: s.doorX, y: 1.25, z: dz, sx: 1.7, sy: 2.6, sz: 0.1 }, 'solid', M); // front at +0.05
+  B.add(GEO.box, s.door, { x: s.doorX, y: 1.15, z: dz + 0.09, sx: 1.05, sy: 2.25, sz: 0.06 }, 'solid', M); // front at +0.12
+  B.add(GEO.box, '#ffd27a', { x: s.doorX + 0.32, y: 1.12, z: dz + 0.15, sx: 0.08, sy: 0.08, sz: 0.06 }, 'solid', M);
+  // sidelights (front at +0.10, well clear of the trim)
+  for (const side of [-1, 1]) B.add(GEO.box, '#ffffff', { x: s.doorX + side * 0.68, y: 1.25, z: dz + 0.08, sx: 0.22, sy: 1.9, sz: 0.04 }, 'window', M);
   // front steps go all the way down into the ground, and are walkable
   s.steps = [];
   const step = (z, d, w, top) => {
@@ -228,7 +231,7 @@ function buildOne(B, s, M) {
     for (const cx of cols) {
       if (Math.abs(cx - s.doorX) < 1.3 && row < 3) continue;
       const inBay = s.frontGable && Math.abs(cx) < bayW / 2;
-      addWindow(B, M, cx, row, D / 2 + (inBay && bayOut ? 0.5 : 0) + (s.stoneBand && row < 3 ? 0.2 : 0) + 0.02, 1.15, 1.55, { shutters: s.shutters ? s.shutterColor : null, haunted, shutterTilt: tilt() });
+      addWindow(B, M, cx, row, D / 2 + (inBay && bayOut ? 0.5 : 0) + ((s.stoneBand || lowerStone) && row < 3 ? stoneFace : 0) + 0.04, 1.15, 1.55, { shutters: s.shutters ? s.shutterColor : null, haunted, shutterTilt: tilt() });
     }
   }
   if (s.home) addWindow(B, M, 0.0, 4.4, D / 2 + 0.52, 1.05, 1.45, { shutters: s.shutterColor, haunted, shutterTilt: tilt() });

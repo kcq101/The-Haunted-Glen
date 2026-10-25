@@ -51,7 +51,7 @@ renderer.toneMappingExposure = 1.05;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 330);
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.3, 330); // near 0.3 = sharper depth, less flicker
 const sky = new DayNight(scene);
 const glows = new GlowField(2500);
 scene.add(glows.points);
