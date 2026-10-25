@@ -425,7 +425,19 @@ function paintGround(driveways, walkways) {
   fillCircle(ctx, culDeSac, culDeSac.r + 1.6, stripPat);
 
   // Driveways and front walkways cross the sidewalk
-  for (const dw of driveways) strokeLine(ctx, [dw.a, dw.b], dw.width, '#b9b5ab');
+  // driveways: halfway between the sidewalk concrete and the street asphalt,
+  // with a little speckle like the road
+  const drive = makeTile(64, (c, sz) => {
+    c.fillStyle = '#8a8a88';
+    c.fillRect(0, 0, sz, sz);
+    for (let i = 0; i < 400; i++) {
+      const g = 118 + Math.random() * 40;
+      c.fillStyle = `rgb(${g},${g},${g - 2})`;
+      c.fillRect(Math.random() * sz, Math.random() * sz, 1, 1);
+    }
+  });
+  const drivePat = ctx.createPattern(drive, 'repeat');
+  for (const dw of driveways) strokeLine(ctx, [dw.a, dw.b], dw.width, drivePat);
   for (const w of walkways) strokeLine(ctx, [w.a, w.b], w.width, w.color || '#a9a39a');
 
   for (const r of roadLines) strokeLine(ctx, r.line, r.width + 0.5, '#d4d1c8');
