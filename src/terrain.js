@@ -138,7 +138,7 @@ export function createTerrain(pads, driveways, walkways) {
         const wo = p.walkout;
         hdBack = p.hd + wo.yard;
         const backWall = -wo.depth / 2;
-        const low = p.h - wo.drop * smoothstep(wo.depth * 0.1, backWall - 0.6, lzs);
+        const low = p.h - wo.drop * smoothstep(0, backWall - 0.6, lzs); // grade starts halfway back
         target = lerp(low, h, smoothstep(backWall - 2.5, backWall - wo.yard - 4, lzs));
       }
       const d = Math.max(lx - p.hw, lzs >= 0 ? lzs - p.hd : -lzs - hdBack, 0);
@@ -163,6 +163,10 @@ export function createTerrain(pads, driveways, walkways) {
       // the basement is as tall as the land falls behind the house (within a
       // story), so the back yard meets the natural slope without a pit
       wo.drop = Math.min(wo.maxDrop, Math.max(wo.minDrop, p.h - natural(p.x + sn * b, p.z + cs * b)));
+    } else if (p.depth) {
+      // never sit a house below its own front yard
+      const sn = Math.sin(p.rot), cs = Math.cos(p.rot), f = p.depth / 2 + 4;
+      p.h = Math.max(p.h, natural(p.x + sn * f, p.z + cs * f));
     }
   }
 

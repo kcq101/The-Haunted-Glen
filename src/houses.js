@@ -79,7 +79,7 @@ export function makeHouseSpecs() {
 
     // Pad, driveway and front walk for the ground painter
     const padCenter = toWorld(spec, spec.garageSide * spec.gw / 2, 0);
-    spec.pad = { x: padCenter.x, z: padCenter.z, rot: spec.rot, hw: (spec.W + spec.gw) / 2 + 1.2, hd: spec.D / 2 + 1.6 };
+    spec.pad = { x: padCenter.x, z: padCenter.z, rot: spec.rot, hw: (spec.W + spec.gw) / 2 + 1.2, hd: spec.D / 2 + 1.6, depth: spec.D };
     if (h.walkout) {
       // ground drops a full story from the front of the house to the back yard
       spec.walkout = WALKOUT_DROP;

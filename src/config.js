@@ -145,10 +145,12 @@ export const HOUSES = [
   { id: 'b104', x: 386, y: 770, facing: 'E', walkout: true },
   { id: 'b106', x: 384, y: 852, facing: 'E', walkout: true },
   { id: 'b108', x: 388, y: 930, facing: 'E', walkout: true },
-  // West side of Iron Works, facing east (garages on the right, like the real ones)
-  { id: 'h1020', x: 138, y: 592, facing: 'E', garage: 1 },
-  { id: 'h1024', x: 138, y: 672, facing: 'E', garage: 1 },
-  { id: 'h1026', x: 140, y: 752, facing: 'E', garage: 1 },
+  // West side of Iron Works, facing east (garages on the right, like the real ones).
+  // The north ones sit on ground that falls away to the west, so they get
+  // walkout basements like the Brinell houses.
+  { id: 'h1020', x: 138, y: 592, facing: 'E', garage: 1, walkout: true },
+  { id: 'h1024', x: 138, y: 672, facing: 'E', garage: 1, walkout: true },
+  { id: 'h1026', x: 140, y: 752, facing: 'E', garage: 1, walkout: true },
   { id: 'h1028', x: 138, y: 840, facing: 'E', garage: 1 },
   { id: 'h1030', x: 142, y: 918, facing: 'E', garage: 1 },
   { id: 'h1032', x: 146, y: 998, facing: 'E', garage: 1 },
