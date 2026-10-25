@@ -42,7 +42,18 @@ export function buildStoreExterior(B, glows, scene, heightAt) {
   B.add(GEO.box, '#7a3a7a', { y: 1.9, z: SD / 2 + 0.1, sx: 1.9, sy: 2.6, sz: 0.15 }, 'solid', M);
   B.add(GEO.cyl, '#7a3a7a', { y: 3.2, z: SD / 2 + 0.1, rx: Math.PI / 2, sx: 0.95, sy: 0.15, sz: 0.95 }, 'solid', M);
   B.add(GEO.sphere, '#e8c64a', { x: 0.55, y: 1.9, z: SD / 2 + 0.22, s: 0.16 }, 'solid', M);
-  B.add(GEO.box, '#8d8273', { y: 0.95, z: SD / 2 + 0.9, sx: 3, sy: 0.3, sz: 1.4 }, 'solid', M);
+  // stone landing + two steps down to the yard. Each block runs down into the
+  // ground so there are no floating gaps, and each top is walkable.
+  const steps = [];
+  const stoneStep = (lz, d, w, top, col) => {
+    B.add(GEO.box, col, { y: (top - 0.3) / 2, z: lz, sx: w, sy: top + 0.3, sz: d }, 'solid', M);
+    B.add(GEO.box, '#a39886', { y: top - 0.03, z: lz + d / 2 - 0.06, sx: w + 0.04, sy: 0.06, sz: 0.14 }, 'solid', M); // lighter nosing so each step reads
+    const p = toStoreWorld(0, lz);
+    steps.push({ cx: p.x, cz: p.z, rot: STORE.facing, hw: w / 2, hd: d / 2, top: y + top, r: Math.hypot(w / 2, d / 2) + 0.3 });
+  };
+  stoneStep(SD / 2 + 0.85, 1.3, 3.4, 1.1, '#8d8273'); // landing at the door
+  stoneStep(SD / 2 + 1.85, 0.7, 3.2, 0.74, '#857a6b');
+  stoneStep(SD / 2 + 2.55, 0.7, 3.0, 0.37, '#7d7263');
   // big glowing shop windows with little panes
   for (const sd of [-1, 1]) {
     B.add(GEO.box, '#4a3020', { x: sd * 3.6, y: 2.6, z: SD / 2 + 0.06, sx: 3.0, sy: 2.2, sz: 0.12 }, 'solid', M);
@@ -64,7 +75,7 @@ export function buildStoreExterior(B, glows, scene, heightAt) {
   const rng = (() => { let k = 3; return () => ((k = (k * 16807) % 2147483647) / 2147483647); })();
   for (let i = 0; i < 12; i++) {
     const sd = i % 2 ? 1 : -1;
-    const p = toStoreWorld(sd * (2.0 + rng() * 3.5), SD / 2 + 1.6 + rng() * 2.2);
+    const p = toStoreWorld(sd * (2.5 + rng() * 3.2), SD / 2 + 1.6 + rng() * 2.2); // clear of the steps
     addPumpkin(B, glows, p.x, heightAt(p.x, p.z), p.z, 0.3 + rng() * 0.35, STORE.facing, rng() < 0.4, ['#ef7d1f', '#f2eee0', '#e2a03a', '#d8662a'][(rng() * 4) | 0]);
   }
   // weathervane hare on the roof ridge
@@ -81,16 +92,16 @@ export function buildStoreExterior(B, glows, scene, heightAt) {
   scene.add(hm);
 
   // shop sign: a big painted board on posts out front where the trail arrives
-  const tex = textTexture(['Hares Hill', 'Halloween Emporium'], { w: 768, h: 256, bg: '#3a2448', fg: '#ffd27a', border: '#e8c64a', font: 'bold 70px Georgia, serif' });
-  const sp = toStoreWorld(-4.6, SD / 2 + 5.2);
+  const tex = textTexture(['Hares Hill', 'Halloween Emporium'], { w: 1024, h: 256, bg: '#3a2448', fg: '#ffd27a', border: '#e8c64a', font: 'bold 76px Georgia, serif' });
+  const sp = toStoreWorld(-4.9, SD / 2 + 5.2);
   const sgy = heightAt(sp.x, sp.z);
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 1.4), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 1.4), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
   sign.position.set(sp.x, sgy + 2.3, sp.z);
   sign.rotation.y = STORE.facing + 0.35;
   scene.add(sign);
   for (const sd of [-1, 1]) {
     const c = Math.cos(STORE.facing + 0.35), s2 = Math.sin(STORE.facing + 0.35);
-    B.add(GEO.box, '#4a3020', { x: sp.x + sd * 1.9 * c, y: sgy + 1.3, z: sp.z - sd * 1.9 * s2, sx: 0.2, sy: 2.6, sz: 0.2 });
+    B.add(GEO.box, '#4a3020', { x: sp.x + sd * 2.75 * c, y: sgy + 1.3, z: sp.z - sd * 2.75 * s2, sx: 0.2, sy: 2.6, sz: 0.2, ry: STORE.facing + 0.35 });
   }
   const signGlow = glows.add({ x: sp.x, y: sgy + 2.3, z: sp.z }, '#ffd27a', 4, 0.0, 0);
   // small sign over the door too
@@ -116,7 +127,7 @@ export function buildStoreExterior(B, glows, scene, heightAt) {
 
   const door = toStoreWorld(0, SD / 2 + 2.4);
   const collider = { x: storePos.x, z: storePos.z, hw: SW / 2 + 0.4, hd: SD / 2 + 0.4, rot: STORE.facing };
-  return { door: { ...door, y: heightAt(door.x, door.z) }, collider, signGlow };
+  return { door: { ...door, y: heightAt(door.x, door.z) }, collider, signGlow, steps };
 }
 
 // --- shopkeeper -------------------------------------------------------------

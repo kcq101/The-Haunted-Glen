@@ -107,6 +107,7 @@ function buildWorld() {
   const store = buildStoreExterior(B, glows, scene, terrain.heightAt);
   W.store = store;
   W.colliders.push(store.collider);
+  W.steps.push(...store.steps);
   const meshes = B.build(mats);
   for (const m of meshes) {
     m.castShadow = m.name === 'solid';

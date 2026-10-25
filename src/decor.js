@@ -193,6 +193,13 @@ function textTexture(lines, opts = {}) {
   for (let i = 0; i < 14; i++) { g.fillStyle = `rgba(0,0,0,${0.04 + Math.random() * 0.05})`; g.fillRect(0, Math.random() * h, w, 2 + Math.random() * 4); }
   g.strokeStyle = border; g.lineWidth = 14; g.strokeRect(7, 7, w - 14, h - 14);
   g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = font;
+  // shrink the font if any line would run past the border
+  const maxW = w - 64;
+  const widest = Math.max(...lines.map((l) => g.measureText(l).width));
+  if (widest > maxW) {
+    const px = parseFloat(font.match(/(\d+(?:\.\d+)?)px/)[1]);
+    g.font = font.replace(/\d+(?:\.\d+)?px/, `${Math.floor((px * maxW) / widest)}px`);
+  }
   lines.forEach((l, i) => g.fillText(l, w / 2, h / 2 + (i - (lines.length - 1) / 2) * (h / (lines.length + 0.6))));
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
