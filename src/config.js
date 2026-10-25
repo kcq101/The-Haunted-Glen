@@ -123,9 +123,10 @@ export const HOUSES = [
   { id: 'h1002', x: 556, y: 455, facing: 'S', garage: 1 },
   { id: 'h1000', x: 650, y: 440, facing: 'S', garage: -1 },
   { id: 'h0998', x: 733, y: 440, facing: 'SW', garage: -1 },
-  // Cul-de-sac, south side
-  { id: 'h1001', x: 508, y: 592, facing: 'N' },
-  { id: 'h1003', x: 595, y: 590, facing: 'N' },
+  // Cul-de-sac, south side (between Brinell and the cul-de-sac): garages on
+  // the left seen from the street
+  { id: 'h1001', x: 508, y: 592, facing: 'N', garage: -1 },
+  { id: 'h1003', x: 595, y: 590, facing: 'N', garage: -1 },
   // East side of Brinell
   { id: 'b101', x: 512, y: 686, facing: 'W' },
   { id: 'b103', x: 515, y: 775, facing: 'W' },
