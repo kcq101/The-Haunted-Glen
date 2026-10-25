@@ -10,6 +10,7 @@ const ROOFS = ['#3d4146', '#4a4744', '#55524f', '#34383d', '#5b544c'];
 const DOORS = ['#1f2326', '#7a2222', '#243a5e', '#5c3b24', '#2f4a3a'];
 const STONE = ['#a08f7c', '#9b8a76', '#b4a28c', '#8d7f70'];
 const TRIM = '#f4f3ee';
+export const WALKOUT_DROP = 2.7; // how far the back yard sits below the front (one story)
 
 // Turn local house coordinates (front faces +z) into world coordinates.
 function toWorld(spec, lx, lz) {
@@ -79,6 +80,11 @@ export function makeHouseSpecs() {
     // Pad, driveway and front walk for the ground painter
     const padCenter = toWorld(spec, spec.garageSide * spec.gw / 2, 0);
     spec.pad = { x: padCenter.x, z: padCenter.z, rot: spec.rot, hw: (spec.W + spec.gw) / 2 + 1.2, hd: spec.D / 2 + 1.6 };
+    if (h.walkout) {
+      // ground drops a full story from the front of the house to the back yard
+      spec.walkout = WALKOUT_DROP;
+      spec.pad.walkout = { drop: WALKOUT_DROP, depth: spec.D, yard: 9 };
+    }
 
     const garageFront = spec.home
       ? toWorld(spec, spec.gx + spec.garageSide * (spec.gw / 2 + 1.6), spec.D / 2 - 2)
@@ -251,8 +257,12 @@ function buildOne(B, s, M) {
     }
   }
   for (const cx of [-W * 0.3, 0, W * 0.3]) {
-    for (const row of [1.7, 4.4]) addWindow(B, M, cx, row, -D / 2 - 0.02, 1.1, 1.45, { ry: Math.PI, haunted });
+    for (const row of [1.7, 4.4]) {
+      if (s.walkout && cx === 0 && row < 3) continue; // slider to the deck instead
+      addWindow(B, M, cx, row, -D / 2 - 0.02, 1.1, 1.45, { ry: Math.PI, haunted });
+    }
   }
+  if (s.walkout) addWalkout(B, s, M);
 
   // chimney
   if (s.chimney) B.add(GEO.box, s.stone || '#8f5a46', { x: -s.garageSide * (W / 2 - 1.2), y: H + 2.4, z: -0.8, sx: 1.2, sy: 4.8, sz: 1.2 }, 'solid', M);
@@ -293,6 +303,71 @@ function buildOne(B, s, M) {
     if (Math.abs(t - s.doorX) < 1.4) continue;
     const r = 0.7 + rng() * 0.35;
     B.add(GEO.sphereLo, shrubCols[(rng() * shrubCols.length) | 0], { x: t, y: r * 0.55, z: D / 2 + 0.95 + (bayOut && Math.abs(t) < bayW / 2 ? 0.5 : 0), sx: r * 1.6, sy: r * 1.2, sz: r * 1.3 }, 'solid', M);
+  }
+}
+
+// Sliding glass door on a back wall (faces -z); z = wall face
+function addSlider(B, M, x, y0, z, w) {
+  const h = 2.15;
+  B.add(GEO.box, TRIM, { x, y: y0 + h / 2, z: z - 0.04, sx: w + 0.24, sy: h + 0.14, sz: 0.08 }, 'solid', M);
+  B.add(GEO.box, '#ffffff', { x, y: y0 + h / 2 - 0.02, z: z - 0.1, sx: w, sy: h - 0.1, sz: 0.04 }, 'window', M);
+  B.add(GEO.box, TRIM, { x, y: y0 + h / 2, z: z - 0.15, sx: 0.09, sy: h - 0.08, sz: 0.05 }, 'solid', M); // center stile
+  B.add(GEO.box, '#7d7a74', { x, y: y0 + 0.03, z: z - 0.15, sx: w + 0.1, sy: 0.06, sz: 0.1 }, 'solid', M); // track
+}
+
+// Walkout basement (exposed at the back, ground slopes down) with a raised
+// deck off the main floor: posts, white railings and stairs down to the yard.
+function addWalkout(B, s, M) {
+  const { W, D } = s, drop = s.walkout;
+  const back = -D / 2;
+  // basement walls in siding, 4 cm proud of the foundation so they never flicker
+  B.add(GEO.box, s.siding, { y: (-0.05 - drop - 0.5) / 2, sx: W + 0.38, sy: drop + 0.45, sz: D + 0.38 }, 'solid', M);
+  const bw = back - 0.19; // basement back face
+  addSlider(B, M, 0, -drop + 0.05, bw, 2.3);
+  for (const cx of [-W * 0.33, W * 0.33]) addWindow(B, M, cx, -drop + 1.45, bw - 0.06, 1.0, 1.0, { ry: Math.PI });
+  // main-floor slider onto the deck
+  addSlider(B, M, 0, 0.05, back - 0.02, 2.3);
+
+  // deck
+  const dw = Math.min(W * 0.62, 7.4), dd = 3.8, dz = back - 0.2 - dd / 2, top = -0.12;
+  const WOOD = '#8a6a4c', RAIL = '#f2f1ec';
+  B.add(GEO.box, WOOD, { x: 0, y: top - 0.12, z: dz, sx: dw, sy: 0.24, sz: dd }, 'solid', M);
+  B.add(GEO.box, '#6f553d', { x: 0, y: top - 0.38, z: dz, sx: dw - 0.3, sy: 0.28, sz: dd - 0.3 }, 'solid', M); // joists
+  const postH = drop + top - 0.2;
+  for (const px of [-dw / 2 + 0.2, 0, dw / 2 - 0.2]) {
+    B.add(GEO.box, '#e6e3dc', { x: px, y: top - 0.24 - postH / 2, z: back - 0.2 - dd + 0.2, sx: 0.22, sy: postH, sz: 0.22 }, 'solid', M);
+  }
+  // railings on the three open sides, with a gap for the stairs on one side
+  const stairSide = -s.garageSide; // stairs come down on the side away from the garage
+  const railY = top + 0.95;
+  const run = (ax, az, bx, bz) => {
+    const L = Math.hypot(bx - ax, bz - az), ry = Math.atan2(bx - ax, bz - az);
+    const n = Math.max(1, Math.round(L / 0.18));
+    B.add(GEO.box, RAIL, { x: (ax + bx) / 2, y: railY, z: (az + bz) / 2, ry, sx: 0.1, sy: 0.08, sz: L }, 'solid', M);
+    B.add(GEO.box, RAIL, { x: (ax + bx) / 2, y: top + 0.12, z: (az + bz) / 2, ry, sx: 0.08, sy: 0.06, sz: L }, 'solid', M);
+    for (let i = 0; i <= n; i++) {
+      const t = i / n, big = i === 0 || i === n || i % 8 === 0;
+      B.add(GEO.box, RAIL, { x: ax + (bx - ax) * t, y: (top + railY) / 2, z: az + (bz - az) * t, sx: big ? 0.12 : 0.04, sy: railY - top, sz: big ? 0.12 : 0.04 }, 'solid', M);
+    }
+  };
+  const x0 = -dw / 2 + 0.05, x1 = dw / 2 - 0.05, zf = back - 0.2, zb = back - 0.2 - dd + 0.05;
+  run(x0, zb, x1, zb); // back
+  const sideX = stairSide < 0 ? x0 : x1, otherX = stairSide < 0 ? x1 : x0;
+  run(otherX, zf, otherX, zb);
+  const gap = 1.25;
+  run(sideX, zf, sideX, zb + gap); // leave an opening at the back corner for the stairs
+  // stairs down the side, away from the house
+  const n = Math.round(drop / 0.21), rise = (drop + top) / n, tread = 0.27;
+  const sx0 = sideX + stairSide * 0.1;
+  for (let i = 1; i <= n; i++) {
+    const y = top - i * rise;
+    B.add(GEO.box, WOOD, { x: sx0 + stairSide * (i - 0.5) * tread, y: y - 0.04, z: zb + gap / 2, sx: tread + 0.03, sy: 0.08, sz: gap - 0.1 }, 'solid', M);
+  }
+  // stringers + stair rails
+  const sL = n * tread, ang = Math.atan2(drop + top, sL);
+  for (const zz of [zb + 0.05, zb + gap - 0.05]) {
+    B.add(GEO.box, '#6f553d', { x: sx0 + stairSide * sL / 2, y: top - (drop + top) / 2 - 0.12, z: zz, rz: -stairSide * ang, sx: Math.hypot(sL, drop + top) + 0.2, sy: 0.22, sz: 0.08 }, 'solid', M);
+    B.add(GEO.box, RAIL, { x: sx0 + stairSide * sL / 2, y: top - (drop + top) / 2 + 0.9, z: zz, rz: -stairSide * ang, sx: Math.hypot(sL, drop + top), sy: 0.07, sz: 0.08 }, 'solid', M);
   }
 }
 

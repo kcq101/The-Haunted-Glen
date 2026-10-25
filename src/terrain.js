@@ -128,10 +128,18 @@ export function createTerrain(pads, driveways, walkways) {
     for (const p of pads) {
       const dx = x - p.x, dz = z - p.z;
       const lx = Math.abs(dx * Math.cos(p.rot) - dz * Math.sin(p.rot));
-      const lz = Math.abs(dx * Math.sin(p.rot) + dz * Math.cos(p.rot));
-      const d = Math.max(lx - p.hw, lz - p.hd, 0);
+      const lzs = dx * Math.sin(p.rot) + dz * Math.cos(p.rot); // + toward the front
+      let target = p.h, hdBack = p.hd;
+      if (p.walkout) {
+        // walkout: level in front, sloping down along the sides of the house to
+        // a back yard one story lower
+        const wo = p.walkout;
+        hdBack = p.hd + wo.yard;
+        target = p.h - wo.drop * smoothstep(wo.depth * 0.1, -wo.depth / 2 - 0.6, lzs);
+      }
+      const d = Math.max(lx - p.hw, lzs >= 0 ? lzs - p.hd : -lzs - hdBack, 0);
       const w = 1 - smoothstep(0.5, 5, d);
-      if (w > 0) { wMax = Math.max(wMax, w); sw += w; sh += w * p.h; }
+      if (w > 0) { wMax = Math.max(wMax, w); sw += w; sh += w * target; }
     }
     if (wMax > 0) h = lerp(h, sh / sw, wMax);
     // Trail is gently leveled across its width

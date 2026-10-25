@@ -136,14 +136,15 @@ export const HOUSES = [
   { id: 'h1015', x: 268, y: 775, facing: 'W' },
   { id: 'h1017', x: 276, y: 860, facing: 'W' },
   { id: 'h1019', x: 272, y: 940, facing: 'W' },
-  // Inner block, facing Brinell (east)
+  // Inner block, facing Brinell (east). The ground falls away behind these, so
+  // they have walkout basements with sliding doors and a raised deck out back.
   // Corner of Brinell and Iron Works: faces Brinell, garage on the Iron Works
   // side (doors on the side) with the driveway out to Iron Works
-  { id: 'b100', x: 382, y: 602, facing: 'E', garage: 1, sideLoad: true, street: 'Iron Works Rd' },
-  { id: 'b102', x: 384, y: 682, facing: 'E' },
-  { id: 'b104', x: 386, y: 770, facing: 'E' },
-  { id: 'b106', x: 384, y: 852, facing: 'E' },
-  { id: 'b108', x: 388, y: 930, facing: 'E' },
+  { id: 'b100', x: 382, y: 602, facing: 'E', garage: 1, sideLoad: true, street: 'Iron Works Rd', walkout: true },
+  { id: 'b102', x: 384, y: 682, facing: 'E', walkout: true },
+  { id: 'b104', x: 386, y: 770, facing: 'E', walkout: true },
+  { id: 'b106', x: 384, y: 852, facing: 'E', walkout: true },
+  { id: 'b108', x: 388, y: 930, facing: 'E', walkout: true },
   // West side of Iron Works, facing east (garages on the right, like the real ones)
   { id: 'h1020', x: 138, y: 592, facing: 'E', garage: 1 },
   { id: 'h1024', x: 138, y: 672, facing: 'E', garage: 1 },
