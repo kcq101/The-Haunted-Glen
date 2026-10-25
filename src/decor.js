@@ -101,19 +101,6 @@ function addStringLights(B, glows, s, colors) {
   });
 }
 
-function addMailbox(B, x, y, z, ry) {
-  B.add(GEO.box, '#2b2b2b', { x, y: y + 0.55, z, sx: 0.1, sy: 1.1, sz: 0.1 });
-  B.add(GEO.box, '#1f2326', { x, y: y + 1.15, z, ry, sx: 0.32, sy: 0.32, sz: 0.55 });
-  B.add(GEO.cyl, '#1f2326', { x, y: y + 1.3, z, ry, rx: Math.PI / 2, sx: 0.32, sy: 0.55, sz: 0.32 });
-}
-
-// distance from a point to the edge of the nearest road (negative = on the road)
-function roadSurfaceDist(x, z) {
-  let best = Math.hypot(x - culDeSac.x, z - culDeSac.z) - culDeSac.r;
-  for (const r of roadLines) best = Math.min(best, polylineDistance(x, z, r.line).d - r.width / 2);
-  return best;
-}
-
 // --- neighborhood decorations ----------------------------------------------
 export function decorateNeighborhood(B, glows, specs, heightAt) {
   for (const s of specs) {
@@ -144,13 +131,6 @@ export function decorateNeighborhood(B, glows, specs, heightAt) {
     }
     if (rng() < 0.25) { const p = W(-s.garageSide * s.W * 0.4, s.D / 2 + 3.5); addSkeleton(B, p.x, p.y, p.z, s.rot); }
     if (rng() < 0.35) addStringLights(B, glows, s, rng() < 0.5 ? ['#ff8a1f', '#ff8a1f', '#9b5cff'] : ['#ff8a1f', '#7cff6b', '#9b5cff']);
-    // mailbox at the curb next to the driveway
-    const dw = s.driveway;
-    const dx = dw.a.x - dw.b.x, dz = dw.a.z - dw.b.z, L = Math.hypot(dx, dz) || 1;
-    let t = 0;
-    while (t < L && roadSurfaceDist(dw.b.x + (dx / L) * t, dw.b.z + (dz / L) * t) < 1.0) t += 0.25;
-    const mx = dw.b.x + (dx / L) * t - (dz / L) * 3.4, mz = dw.b.z + (dz / L) * t + (dx / L) * 3.4;
-    addMailbox(B, mx, heightAt(mx, mz), mz, s.rot);
   }
 }
 
