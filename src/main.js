@@ -57,7 +57,7 @@ const sky = new DayNight(scene);
 const glows = new GlowField(2500);
 scene.add(glows.points);
 // soft "moonlight" that follows the kids so they stay visible at night
-const kidLight = new THREE.PointLight('#ffd9a8', 0, 14, 1.4);
+const kidLight = new THREE.PointLight('#cfdcff', 0, 14, 1.4);
 scene.add(kidLight);
 
 const save = loadSave();
