@@ -632,13 +632,14 @@ const dayWin = new THREE.Color('#5d6b80'), nightWin = new THREE.Color('#ffd28a')
 const dayLamp = new THREE.Color('#d8d0b8'), nightLamp = new THREE.Color('#ffffff').multiplyScalar(1.9);
 const dayShop = new THREE.Color('#ffd9a0'), nightShop = new THREE.Color('#ffc070').multiplyScalar(1.7);
 let stepT = 0;
+const PITCH_LOW = 0.12; // lowest orbit angle behind the kid
 
 function updateWorld(dt) {
   const kid = kids[current];
   const inp = controls.input;
   const look = controls.consumeLook();
   cam.yaw -= look.dx * 0.006;
-  cam.pitch = clamp(cam.pitch + look.dy * 0.004, 0.12, 1.1);
+  cam.pitch = clamp(cam.pitch + look.dy * 0.004, PITCH_LOW - 1.45, 1.1); // below PITCH_LOW the view tilts up toward the sky
 
   let moving = false;
   const speed = CHARACTERS[current].speed;
@@ -716,15 +717,27 @@ function updateWorld(dt) {
   // camera
   const headY = player.y + CHARACTERS[current].height * 0.85;
   cam.target.set(player.x, headY, player.z);
-  const cx = player.x + Math.sin(cam.yaw) * Math.cos(cam.pitch) * cam.dist;
-  const cz = player.z + Math.cos(cam.yaw) * Math.cos(cam.pitch) * cam.dist;
-  let cy = headY + Math.sin(cam.pitch) * cam.dist;
+  // Past the lowest orbit angle, the camera drops to about head height and
+  // swings closer, then tilts its view upward so you can look right up at the sky.
+  const lookUp = Math.max(0, PITCH_LOW - cam.pitch); // 0 .. ~1.45
+  const lu = Math.min(1, lookUp / 0.6);
+  const orbitPitch = Math.max(cam.pitch, PITCH_LOW) - lu * (PITCH_LOW + 0.04);
+  const dist = cam.dist * (1 - 0.3 * lu);
+  const cx = player.x + Math.sin(cam.yaw) * Math.cos(orbitPitch) * dist;
+  const cz = player.z + Math.cos(cam.yaw) * Math.cos(orbitPitch) * dist;
+  let cy = headY + Math.sin(orbitPitch) * dist;
   cy = Math.max(cy, W.heightAt(cx, cz) + 0.6);
   const desired = tmpV.set(cx, cy, cz);
   cam.pos.lerp(desired, Math.min(1, dt * 6));
   if (cam.pos.lengthSq() === 0 || cam.snap) { cam.pos.copy(desired); cam.snap = false; }
   camera.position.copy(cam.pos);
-  camera.lookAt(cam.target);
+  if (lookUp > 0) {
+    // start from the normal "look at the kid" direction and raise it
+    const dx = cam.target.x - cam.pos.x, dy = cam.target.y - cam.pos.y, dz = cam.target.z - cam.pos.z;
+    const h = Math.hypot(dx, dz) || 1;
+    const elev = Math.min(Math.atan2(dy, h) + lookUp * 1.1, 1.5);
+    camera.lookAt(cam.pos.x + (dx / h) * Math.cos(elev), cam.pos.y + Math.sin(elev), cam.pos.z + (dz / h) * Math.cos(elev));
+  } else camera.lookAt(cam.target);
   if (window.__debugCam) { camera.position.set(...window.__debugCam.pos); camera.lookAt(...window.__debugCam.look); if (window.__debugCam.nofog) { scene.fog.near = 1e4; scene.fog.far = 1e5; } }
   W.backdrop.update(sky, camera);
   renderer.render(scene, camera);
