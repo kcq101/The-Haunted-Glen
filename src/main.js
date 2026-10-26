@@ -9,10 +9,11 @@ import { createBackdrop } from './backdrop.js';
 import { GlowField } from './glow.js';
 import { DayNight, NIGHT_START } from './sky.js';
 import { decorateNeighborhood, addStreetLamps, addTrail, hauntHome, addBoundaryFence } from './decor.js';
-import { buildStoreExterior, buildStoreInterior, HAZEL_LINES } from './store.js';
+import { buildStoreExterior, HAZEL_LINES } from './store.js';
+import { buildStoreInterior } from './shopinside.js';
 import { Kid } from './character.js';
 import { Controls } from './controls.js';
-import { ITEMS, ITEM, SLOTS } from './costumes.js';
+import { ITEM } from './costumes.js';
 import { HauntedHouse, CORN_TOTAL, CORN_REWARDS } from './haunted2d.js';
 import { initAudio, sfx, setMuted, isMuted, updateAmbient } from './audio.js';
 import { loadSave, writeSave } from './save.js';
@@ -413,26 +414,29 @@ $('reward-ok').addEventListener('click', () => $('reward').classList.add('hidden
 // ---------------------------------------------------------------------------
 // Shop
 // ---------------------------------------------------------------------------
-let shopSlot = 'hat';
-let preview = null; // { slot, id }
+let shopPage = 0; // 0 = the whole shop, 1..4 = zoomed in on one shelf bay
+let preview = null; // { slot, id } — something being tried on that isn't bought yet
+const shopCam = { fov: 55, tFov: 55, pos: new THREE.Vector3(), look: new THREE.Vector3(), tPos: new THREE.Vector3(), tLook: new THREE.Vector3(), key: '', snap: true };
+const isPortrait = () => window.innerWidth / window.innerHeight < 1.05;
 
 function enterShop() {
   sfx.door();
   fadeTo(() => {
     mode = 'shop';
     controls.reset();
+    controls.enabled = false;
     hideToast();
-    controls.enabled = true;
     const I = W.interior;
     I.scene.add(kids[current].root, kids[other()].root);
-    kids[current].root.position.copy(I.stand);
-    kids[current].root.rotation.y = 0.25;
-    kids[other()].root.position.set(I.stand.x - 2.2, 0, I.stand.z - 0.6);
-    kids[other()].root.rotation.y = 0.5;
+    shopPage = 0;
+    setShopTargets(true);
     $('hud').classList.add('hidden');
     $('shop').classList.remove('hidden');
     $('hazel-text').textContent = pick(HAZEL_LINES.welcome);
+    I.hazel.userData.wave();
     preview = null;
+    shopCam.snap = true;
+    shopCam.key = '';
     renderShop();
   });
 }
@@ -442,6 +446,9 @@ function leaveShop() {
   fadeTo(() => {
     mode = 'world';
     camera.clearViewOffset();
+    camera.fov = 55;
+    camera.updateProjectionMatrix();
+    controls.enabled = true;
     scene.add(kids[current].root, kids[other()].root);
     $('shop').classList.add('hidden');
     $('hud').classList.remove('hidden');
@@ -454,6 +461,26 @@ function leaveShop() {
   });
 }
 
+// Where each boy should stand: on the rug for the whole-shop view, or the
+// shopper walks up to the shelf bay in view.
+function setShopTargets(snap = false) {
+  const I = W.interior;
+  const cur = kids[current].root, oth = kids[other()].root;
+  cur.userData.shopTarget = shopPage ? I.bayFront(shopPage - 1, isPortrait()) : I.stand.clone();
+  oth.userData.shopTarget = I.standOther.clone();
+  if (snap) for (const r of [cur, oth]) { r.position.copy(r.userData.shopTarget); r.rotation.y = 0; }
+}
+
+function setShopPage(i) {
+  const n = W.interior.BAYS.length + 1;
+  const next = (i + n) % n;
+  if (next === shopPage) return;
+  shopPage = next;
+  sfx.click();
+  setShopTargets();
+  renderShop();
+}
+
 function revertPreview() {
   if (!preview) return;
   const kid = kids[current];
@@ -462,52 +489,62 @@ function revertPreview() {
   preview = null;
 }
 
+function tagFor(it) {
+  if (save.outfits[current][it.slot] === it.id) return { kind: 'wearing', text: 'Wearing' };
+  if (save.owned.includes(it.id)) return { kind: 'owned', text: 'Yours ✓' };
+  if (it.reward) return { kind: 'prize', text: '👻 Prize' };
+  return { kind: 'price', text: `🍬 ${it.cost}` };
+}
+
 function renderShop() {
+  const I = W.interior;
+  for (const c of I.cells) {
+    const it = ITEM[c.id];
+    const tag = tagFor(it);
+    const key = tag.kind + tag.text;
+    if (c.tagKey !== key) { c.tag.userData.draw(tag); c.tagKey = key; }
+    c.state = preview && preview.id === c.id ? 'trying' : tag.kind === 'wearing' ? 'wearing' : null;
+  }
+  // page buttons (only shown on an upright phone)
   const tabs = $('shop-tabs');
   tabs.innerHTML = '';
-  for (const s of SLOTS) {
-    const b = document.createElement('button');
-    b.className = `shop-tab${s.id === shopSlot ? ' active' : ''}`;
-    b.innerHTML = `<span class="ti">${s.icon}</span>${s.label}`;
-    b.onclick = () => { sfx.click(); revertPreview(); shopSlot = s.id; renderShop(); };
-    tabs.appendChild(b);
-  }
-  const list = $('shop-items');
-  list.innerHTML = '';
-  const worn = kids[current].costume[shopSlot];
-  const saved = save.outfits[current][shopSlot];
-  const none = { id: null, name: 'Nothing', emoji: '🚫' };
-  for (const it of [none, ...ITEMS.filter((i) => i.slot === shopSlot)]) {
-    const owned = it.id === null || save.owned.includes(it.id);
-    const card = document.createElement('button');
-    card.className = `item-card${worn === it.id ? ' selected' : ''}`;
-    let tag;
-    if (saved === it.id && it.id !== null) tag = '<span class="ip wearing">Wearing</span>';
-    else if (owned) tag = it.id === null ? '' : '<span class="ip owned">Yours</span>';
-    else if (it.reward) tag = '<span class="ip locked">👻 Prize</span>';
-    else tag = `<span class="ip">🍬 ${it.cost}</span>`;
-    card.innerHTML = `<span class="ie">${it.emoji}</span><span class="in">${it.name}</span>${tag}`;
-    card.onclick = () => tryOn(it);
-    list.appendChild(card);
-  }
+  [{ icon: '🏪', label: 'Shop' }, ...I.BAYS].forEach((b, i) => {
+    const t = document.createElement('button');
+    t.className = `shop-tab${i === shopPage ? ' active' : ''}`;
+    t.innerHTML = `<span class="ti">${b.icon}</span>${b.label}`;
+    t.onclick = () => setShopPage(i);
+    tabs.appendChild(t);
+  });
+  $('shop-candy').textContent = save.candy;
   updateBuyButton();
 }
 
 function tryOn(it) {
+  initAudio();
   sfx.click();
   const kid = kids[current];
-  const owned = it.id === null || save.owned.includes(it.id);
-  kid.setCostume({ ...kid.costume, [shopSlot]: it.id });
-  if (owned) {
-    save.outfits[current][shopSlot] = it.id;
+  const slot = it.slot;
+  const owned = save.owned.includes(it.id);
+  const taking = owned && save.outfits[current][slot] === it.id;
+  revertPreview();
+  if (taking) {
+    kid.setCostume({ ...kid.costume, [slot]: null });
+    save.outfits[current][slot] = null;
     writeSave(save);
-    preview = null;
-    if (it.id) $('hazel-text').textContent = pick(HAZEL_LINES.buy);
+    $('hazel-text').textContent = pick(HAZEL_LINES.off);
   } else {
-    preview = { slot: shopSlot, id: it.id };
-    if (it.reward) $('hazel-text').textContent = pick(HAZEL_LINES.reward);
-    else if (save.candy < it.cost) $('hazel-text').textContent = `That one costs ${it.cost} candy. ${pick(HAZEL_LINES.poor)}`;
-    else $('hazel-text').textContent = `Looks great! It's ${it.cost} candy.`;
+    kid.setCostume({ ...kid.costume, [slot]: it.id });
+    if (kid.jumpY === 0) kid.jumpV = 3;
+    if (owned) {
+      save.outfits[current][slot] = it.id;
+      writeSave(save);
+      $('hazel-text').textContent = pick(HAZEL_LINES.buy);
+    } else {
+      preview = { slot, id: it.id };
+      if (it.reward) $('hazel-text').textContent = pick(HAZEL_LINES.reward);
+      else if (save.candy < it.cost) $('hazel-text').textContent = `The ${it.name} costs ${it.cost} candy. ${pick(HAZEL_LINES.poor)}`;
+      else $('hazel-text').textContent = `Ooh, the ${it.name}! That's ${it.cost} candy.`;
+    }
   }
   renderShop();
 }
@@ -517,9 +554,9 @@ function updateBuyButton() {
   if (!preview) { btn.classList.add('hidden'); return; }
   const it = ITEM[preview.id];
   btn.classList.remove('hidden');
-  if (it.reward) { btn.textContent = '👻 Find it in the haunted house'; btn.disabled = true; return; }
+  if (it.reward) { btn.textContent = '👻 Haunted house prize'; btn.disabled = true; return; }
   btn.disabled = save.candy < it.cost;
-  btn.textContent = save.candy < it.cost ? `Need 🍬 ${it.cost} (you have ${save.candy})` : `Buy for 🍬 ${it.cost}`;
+  btn.textContent = save.candy < it.cost ? `Need 🍬 ${it.cost}` : `Buy it! 🍬 ${it.cost}`;
 }
 
 $('shop-buy').addEventListener('click', () => {
@@ -532,12 +569,48 @@ $('shop-buy').addEventListener('click', () => {
   writeSave(save);
   preview = null;
   sfx.chime();
+  W.interior.hazel.userData.cheer();
+  if (kids[current].jumpY === 0) kids[current].jumpV = 4.5;
   $('hazel-text').textContent = pick(HAZEL_LINES.buy);
   updateCounters();
   renderShop();
 });
 $('shop-leave').addEventListener('click', () => { sfx.click(); leaveShop(); });
 $('shop-swap').addEventListener('click', () => { sfx.click(); swapKid(); });
+$('shop-prev').addEventListener('click', () => setShopPage(shopPage - 1));
+$('shop-next').addEventListener('click', () => setShopPage(shopPage + 1));
+
+// Taps on the shelves try things on; on an upright phone a sideways swipe
+// moves along the wall.
+const shopRay = new THREE.Raycaster();
+let shopPress = null;
+$('touch-layer').addEventListener('pointerdown', (e) => {
+  if (mode !== 'shop') return;
+  shopPress = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
+});
+window.addEventListener('pointerup', (e) => {
+  if (mode !== 'shop' || !shopPress || e.pointerId !== shopPress.id) return;
+  const dx = e.clientX - shopPress.x, dy = e.clientY - shopPress.y;
+  const quick = performance.now() - shopPress.t < 700;
+  shopPress = null;
+  if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+    if (shopPage) setShopPage(Math.max(1, Math.min(4, shopPage + (dx < 0 ? 1 : -1))));
+    return;
+  }
+  if (Math.hypot(dx, dy) > 14 || !quick) return;
+  const ndc = new THREE.Vector2((e.clientX / window.innerWidth) * 2 - 1, -(e.clientY / window.innerHeight) * 2 + 1);
+  shopRay.setFromCamera(ndc, camera);
+  const I = W.interior;
+  const hit = shopRay.intersectObjects(shopPage ? I.hits : [...I.hits, ...I.bayHits], false)[0];
+  if (!hit) {
+    if (shopPage) { const any = shopRay.intersectObjects(I.bayHits, false)[0]; if (any && any.object.userData.bay !== shopPage - 1) setShopPage(any.object.userData.bay + 1); }
+    return;
+  }
+  const id = hit.object.userData.itemId;
+  const bay = id ? I.cells.find((c) => c.id === id).bay : hit.object.userData.bay;
+  if (bay !== shopPage - 1) { setShopPage(bay + 1); return; } // zoom in first
+  tryOn(ITEM[id]);
+});
 
 // ---------------------------------------------------------------------------
 // Swapping brothers
@@ -546,11 +619,8 @@ function swapKid() {
   initAudio();
   if (mode === 'shop') {
     revertPreview();
-    const a = kids[current], b = kids[other()];
-    const pa = a.root.position.clone(), ra = a.root.rotation.y;
-    a.root.position.copy(b.root.position); a.root.rotation.y = b.root.rotation.y;
-    b.root.position.copy(pa); b.root.rotation.y = ra;
     current = other();
+    setShopTargets();
     save.current = current;
     writeSave(save);
     updateSwapButton();
@@ -785,23 +855,105 @@ function updateWorld(dt) {
   renderer.render(scene, camera);
 }
 
+// Frame the camera on a set of points, leaving room for the shop's buttons.
+const fitV = new THREE.Vector3();
+function fitShopCamera() {
+  const I = W.interior;
+  const w = window.innerWidth, h = window.innerHeight;
+  const portrait = isPortrait();
+  const topH = $('shop-top').getBoundingClientRect().bottom;
+  const botH = portrait ? h - $('shop-bottom').getBoundingClientRect().top : 8;
+  const leftW = portrait ? 0 : document.querySelector('.shop-pager').getBoundingClientRect().right + 4;
+  const rightW = portrait ? 0 : w - document.querySelector('.shop-bar').getBoundingClientRect().left + 4;
+  const key = [w, h, portrait, shopPage, current, Math.round(topH), Math.round(botH), Math.round(leftW), Math.round(rightW)].join();
+  if (key === shopCam.key) return;
+  shopCam.key = key;
+  camera.aspect = w / h;
+  // an upright phone can't fit the whole shop at the normal lens, so widen it
+  shopCam.tFov = portrait && !shopPage ? 80 : 55;
+  const fovNow = camera.fov;
+  camera.fov = shopCam.tFov;
+  camera.setViewOffset(w, h, (rightW - leftW) * 0.5, (botH - topH) * 0.5, w, h);
+  camera.updateProjectionMatrix();
+  const pts = [];
+  const kidPts = (k) => {
+    const t = k.root.userData.shopTarget, kh = CHARACTERS[k === kids[current] ? current : other()].height;
+    pts.push(t.clone().add(new THREE.Vector3(-0.4, 0, 0.3)), t.clone().add(new THREE.Vector3(0.4, 0, 0.3)), t.clone().add(new THREE.Vector3(0, kh + 0.15, 0)));
+  };
+  if (shopPage) { pts.push(...I.bayPoints(shopPage - 1)); kidPts(kids[current]); } else { pts.push(...I.wallPoints); kidPts(kids[current]); kidPts(kids[other()]); }
+  const box = new THREE.Box3().setFromPoints(pts);
+  const target = box.getCenter(new THREE.Vector3());
+  const dir = new THREE.Vector3(0, !shopPage ? 0.36 : portrait ? 0.3 : 0.16, 1).normalize();
+  const u = Math.max(0.2, (h - topH - botH) / h) * 0.96, ux = Math.max(0.2, (w - leftW - rightW) / w) * 0.96;
+  const place = (d) => {
+    camera.position.copy(target).addScaledVector(dir, d);
+    camera.lookAt(target);
+    camera.updateMatrixWorld(true);
+    let x0 = 9, x1 = -9, y0 = 9, y1 = -9;
+    for (const p of pts) {
+      fitV.copy(p).project(camera);
+      x0 = Math.min(x0, fitV.x); x1 = Math.max(x1, fitV.x); y0 = Math.min(y0, fitV.y); y1 = Math.max(y1, fitV.y);
+    }
+    return { x0, x1, y0, y1 };
+  };
+  let d = 10;
+  for (let iter = 0; iter < 4; iter++) {
+    let lo = 1, hi = 60;
+    for (let k = 0; k < 24; k++) {
+      const m = (lo + hi) / 2, b = place(m);
+      if (b.x0 < -ux || b.x1 > ux || b.y0 < -u || b.y1 > u) lo = m; else hi = m;
+    }
+    d = hi;
+    const b = place(d);
+    // recentre: nudge the target so the points sit in the middle of the gap
+    const hh = d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), hw = hh * camera.aspect;
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
+    target.addScaledVector(right, ((b.x0 + b.x1) / 2) * hw).addScaledVector(up, ((b.y0 + b.y1) / 2) * hh);
+  }
+  place(d);
+  shopCam.tPos.copy(camera.position);
+  shopCam.tLook.copy(target);
+  camera.fov = fovNow;
+  camera.updateProjectionMatrix();
+}
+
+function angleTo(a, b, t) {
+  let d = b - a;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
+}
+
 function updateShop(dt) {
   const I = W.interior;
-  const look = controls.consumeLook();
-  const kid = kids[current];
-  kid.root.rotation.y += look.dx * 0.01;
-  kid.update(dt, false, 0, time);
-  kids[other()].update(dt, false, 0, time + 1.1);
-  I.update(time);
-  const h = CHARACTERS[current].height;
-  const wide = window.innerWidth / window.innerHeight;
-  const dist = (wide < 1 ? 4.4 : 3.2) * (0.6 + h * 0.4);
-  camera.position.set(I.stand.x + 0.9, h * 0.9 + 0.5, I.stand.z + dist);
-  camera.lookAt(I.stand.x - (wide > 1.2 ? 0.7 : 0.2), h * 0.55, I.stand.z);
-  // push the picture up so the kid stands above the costume drawer
-  const sheetH = document.querySelector('.shop-sheet').offsetHeight;
-  const topH = document.querySelector('.shop-top').offsetHeight;
-  camera.setViewOffset(window.innerWidth, window.innerHeight, 0, (sheetH - topH) * 0.5, window.innerWidth, window.innerHeight);
+  $('shop').classList.toggle('portrait', isPortrait());
+  if (shopCam.portrait !== isPortrait()) { shopCam.portrait = isPortrait(); setShopTargets(); }
+  // the boys walk to their spots, then turn to show off for the camera
+  [current, other()].forEach((id, n) => {
+    const kid = kids[id], r = kid.root, t = r.userData.shopTarget;
+    const dx = t.x - r.position.x, dz = t.z - r.position.z, dist = Math.hypot(dx, dz);
+    const moving = dist > 0.04;
+    if (moving) {
+      const step = Math.min(dist, 2.4 * dt);
+      r.position.x += (dx / dist) * step; r.position.z += (dz / dist) * step;
+      r.rotation.y = angleTo(r.rotation.y, Math.atan2(dx, dz), Math.min(1, dt * 10));
+    } else {
+      const face = Math.atan2(shopCam.pos.x - r.position.x, shopCam.pos.z - r.position.z) * 0.85 + (n ? -0.25 : 0.15);
+      r.rotation.y = angleTo(r.rotation.y, face, Math.min(1, dt * 5));
+    }
+    kid.update(dt, moving, moving ? 0.5 : 0, time + n * 1.1);
+  });
+  I.update(time, dt);
+  fitShopCamera();
+  if (shopCam.snap) { shopCam.pos.copy(shopCam.tPos); shopCam.look.copy(shopCam.tLook); camera.fov = shopCam.tFov; camera.updateProjectionMatrix(); shopCam.snap = false; }
+  const k = 1 - Math.exp(-dt * 4);
+  if (Math.abs(camera.fov - shopCam.tFov) > 0.01) { camera.fov += (shopCam.tFov - camera.fov) * k; camera.updateProjectionMatrix(); }
+  shopCam.pos.lerp(shopCam.tPos, k);
+  shopCam.look.lerp(shopCam.tLook, k);
+  camera.position.copy(shopCam.pos);
+  camera.lookAt(shopCam.look);
+  if (window.__debugCam) { camera.position.set(...window.__debugCam.pos); camera.lookAt(...window.__debugCam.look); }
   updateAmbient(dt, 0, true);
   renderer.render(I.scene, camera);
 }
@@ -880,4 +1032,4 @@ requestAnimationFrame(() => setTimeout(async () => {
 }, 30));
 
 // handy for testing from the console
-window.__game = { save, sky, player, cam, autoCam, W, kids, get mode() { return mode; }, enterShop, enterHaunted, renderer, scene, camera, get action() { return currentAction; }, doAction, haunted };
+window.__game = { shopCam, get preview() { return preview; }, setShopPage: (i) => setShopPage(i), shopSnap: () => { setShopTargets(true); shopCam.snap = true; }, tryOnId: (id) => tryOn(ITEM[id]), save, sky, player, cam, autoCam, W, kids, get mode() { return mode; }, enterShop, enterHaunted, renderer, scene, camera, get action() { return currentAction; }, doAction, haunted };

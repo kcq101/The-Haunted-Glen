@@ -11,7 +11,7 @@ Open the GitHub Pages link on the tablet, then **Share → Add to Home Screen** 
 | Touch | What it does |
 | --- | --- |
 | Drag on the left half | Walk (joystick appears under your thumb) |
-| Drag on the right half | Turn the camera / spin the kid in the shop |
+| Drag on the right half | Turn the camera |
 | Orange button | Knock, enter, go shopping, BOO! |
 | Purple button | Jump |
 | Kid button (top right) | Switch between Carter and Jack (the other brother follows along) |
@@ -21,7 +21,7 @@ Keyboard also works: WASD/arrows to walk, Q/E to turn, Space to jump, Enter to u
 
 ### The loop
 - **Trick-or-treat:** every glowing door gives 2–4 candy once per night. A full day (morning, noon, golden hour, night) takes 12 minutes; each time night falls the doors glow again.
-- **Hares Hill Halloween Emporium:** past the cul-de-sac, follow the lanterns over the footbridge. Hazel the hare sells hats, faces, outfits and props (pirate, firefighter, monsters, space and superhero). Try anything on for free; buy with candy.
+- **Hares Hill Halloween Emporium:** past the cul-de-sac, follow the lanterns over the footbridge. Hazel the hare runs the front desk; hats, outfits, faces and props sit on four shelf bays (pirate, firefighter, monsters, space and superhero). Tap a shelf to walk up to it, tap a piece to try it on for free, tap it again to take it off; buy with candy.
 - **The haunted house:** the front door of 1018 opens into a 2D, Stardew-style house that is much bigger inside than out (library, great hall, portrait hall, spooky kitchen, Carter's and Jack's rooms, the toy room…). Ghosts hide in closets and the piano and pop out. Tap BOO! to scare them back for candy. Find the 8 golden candy corns for prizes: Skull Mask (3), Pumpkin Head (6), Ghost Sheet (8).
 
 Progress (candy, costumes, candy corns) saves on the device.
@@ -39,7 +39,9 @@ src/decor.js          Halloween decorations, street lamps, trail lanterns, haunt
 src/nature.js         fall trees and falling leaves
 src/sky.js            golden hour / night cycle
 src/backdrop.js       the world beyond: farm fields, barns and hazy hills on the horizon
-src/store.js          Hares Hill Emporium (outside, inside, and Hazel)
+src/store.js          Hares Hill Emporium outside, plus Hazel's lines
+src/shopinside.js     Inside the Emporium: shelf bays, front desk, tap targets, price tags
+src/hazel.js          Hazel the hare shopkeeper (model + animation)
 src/costumes.js       costume catalog (add new items here)
 src/character.js      the kids + costume anchors (stand-in body until the model loads)
 src/meshykid.js       loads the Meshy boys: animation, bone anchors, outfit recolor

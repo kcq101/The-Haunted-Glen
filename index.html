@@ -51,17 +51,20 @@
 
   <!-- Shop -->
   <div id="shop" class="hidden">
-    <div class="shop-top">
-      <div class="shop-title">Hares Hill Halloween Emporium</div>
+    <div class="shop-top" id="shop-top">
       <div class="hazel"><div class="hazel-face">🐰</div><div class="hazel-text" id="hazel-text">Welcome!</div></div>
+      <div class="pill shop-candy"><span class="pill-icon">🍬</span><span id="shop-candy">0</span></div>
     </div>
-    <div class="shop-sheet">
-      <div class="shop-tabs" id="shop-tabs"></div>
-      <div class="shop-items" id="shop-items"></div>
+    <div class="shop-bottom" id="shop-bottom">
+      <div class="shop-pager">
+        <button class="shop-arrow" id="shop-prev" aria-label="Previous shelf">◀</button>
+        <div class="shop-tabs" id="shop-tabs"></div>
+        <button class="shop-arrow" id="shop-next" aria-label="Next shelf">▶</button>
+      </div>
       <div class="shop-bar">
-        <button class="shop-btn leave" id="shop-leave">🚪 Leave shop</button>
-        <button class="shop-btn swap" id="shop-swap">Dress Jack</button>
+        <button class="shop-btn leave" id="shop-leave">🚪 Leave</button>
         <button class="shop-btn buy hidden" id="shop-buy">Buy</button>
+        <button class="shop-btn swap" id="shop-swap">Dress Jack</button>
       </div>
     </div>
   </div>
