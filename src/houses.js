@@ -245,6 +245,9 @@ function buildOne(B, s, M) {
     for (const cx of cols) {
       if (Math.abs(cx - s.doorX) < 1.3 && row < 3) continue;
       const inBay = s.frontGable && Math.abs(cx) < bayW / 2;
+      // home: the upstairs bay has its own center window (below); a second one
+      // here overlapped it and its shutter z-fought with the glass (flicker)
+      if (s.home && inBay && row > 3) continue;
       addWindow(B, M, cx, row, D / 2 + (inBay && bayOut ? 0.5 : 0) + ((s.stoneBand || lowerStone) && row < 3 ? stoneFace : 0) + 0.04, 1.15, 1.55, { shutters: s.shutters ? s.shutterColor : null, haunted, shutterTilt: tilt() });
     }
   }
