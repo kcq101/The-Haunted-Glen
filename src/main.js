@@ -635,19 +635,48 @@ const dayShop = new THREE.Color('#ffd9a0'), nightShop = new THREE.Color('#ffc070
 let stepT = 0;
 const PITCH_LOW = 0.12; // lowest orbit angle behind the kid
 
+// --- auto camera ------------------------------------------------------------
+// After the kid has run in a new direction for a moment, the camera slowly
+// pans back behind them. A quick sidestep doesn't move it, running toward the
+// camera waits longer, and dragging the camera pauses it for a few seconds.
+const AUTO_CAM = {
+  delay: 0.7, // seconds of steady running before the camera starts to follow
+  backDelay: 1.6, // ...when running back toward the camera
+  ramp: 0.8, // seconds to ease up to full follow speed
+  rate: 0.9, // follow strength at full run (per second)
+  maxTurn: 1.0, // never turn faster than this (radians per second, ~57 degrees)
+  backMaxTurn: 0.75, // gentler when swinging all the way around
+  ignore: 0.3, // don't start if within ~17 degrees of behind...
+  settle: 0.05, // ...but once following, finish to within ~3 degrees
+  pause: 2.5, // seconds of no auto-follow after a manual camera drag
+  pitch: 0.38, // the normal camera height it drifts back to
+};
+const autoCam = { t: 0, pause: 0, ctrlYaw: null, stickAng: 0, following: false };
+const wrapAng = (a) => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
+
 function updateWorld(dt) {
   const kid = kids[current];
   const inp = controls.input;
   const look = controls.consumeLook();
   cam.yaw -= look.dx * 0.006;
   cam.pitch = clamp(cam.pitch + look.dy * 0.004, PITCH_LOW - 1.45, 1.1); // below PITCH_LOW the view tilts up toward the sky
+  if (look.dx || look.dy || controls.lookId !== null) { autoCam.pause = AUTO_CAM.pause; autoCam.t = 0; }
+  else autoCam.pause = Math.max(0, autoCam.pause - dt);
 
   let moving = false;
   const speed = CHARACTERS[current].speed;
   if (player.busy > 0) player.busy -= dt;
   else if (inp.mag > 0.02) {
-    // camera-relative movement
-    const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw);
+    // camera-relative movement. While the stick is held, steer relative to
+    // where the camera was when they started, so an auto-pan doesn't curve
+    // their path; re-sync when they push a clearly different way.
+    const stickAng = Math.atan2(inp.x, inp.y);
+    if (autoCam.ctrlYaw === null || Math.abs(wrapAng(stickAng - autoCam.stickAng)) > 0.6) {
+      autoCam.ctrlYaw = cam.yaw;
+      autoCam.stickAng = stickAng;
+    }
+    if (autoCam.pause > 0) autoCam.ctrlYaw = cam.yaw; // manual drag: steer with the view
+    const fx = -Math.sin(autoCam.ctrlYaw), fz = -Math.cos(autoCam.ctrlYaw);
     const rx = -fz, rz = fx;
     const mx = fx * inp.y + rx * inp.x, mz = fz * inp.y + rz * inp.x;
     const L = Math.hypot(mx, mz) || 1;
@@ -659,14 +688,26 @@ function updateWorld(dt) {
     while (dy < -Math.PI) dy += Math.PI * 2;
     player.yaw += dy * Math.min(1, dt * 12);
     moving = true;
-    // gently swing the camera behind the kid while walking
-    let cd = player.yaw + Math.PI - cam.yaw;
-    while (cd > Math.PI) cd -= Math.PI * 2;
-    while (cd < -Math.PI) cd += Math.PI * 2;
-    if (inp.y > 0.3 && controls.lookId === null) cam.yaw += cd * Math.min(1, dt * 0.9) * inp.mag;
+    // slowly pan the camera back behind the kid if they keep going another way
+    const cd = wrapAng(player.yaw + Math.PI - cam.yaw);
+    const near = Math.abs(cd) < (autoCam.following ? AUTO_CAM.settle : AUTO_CAM.ignore);
+    if (autoCam.pause > 0 || near) { autoCam.t = Math.max(0, autoCam.t - dt * 2); if (near) autoCam.following = false; }
+    else autoCam.t += dt;
+    const back = Math.abs(cd) > 2.3; // running toward the camera
+    const delay = back ? AUTO_CAM.backDelay : AUTO_CAM.delay;
+    const ease = clamp((autoCam.t - delay) / AUTO_CAM.ramp, 0, 1);
+    if (ease > 0) {
+      autoCam.following = true;
+      const k = ease * AUTO_CAM.rate * (0.45 + 0.55 * inp.mag);
+      const mt = (back ? AUTO_CAM.backMaxTurn : AUTO_CAM.maxTurn) * ease * dt;
+      const turn = clamp(cd * Math.min(1, dt * k * 1.6), -mt, mt);
+      cam.yaw += turn;
+      cam.pitch += (AUTO_CAM.pitch - cam.pitch) * Math.min(1, dt * 0.6 * ease);
+    }
     stepT -= dt * inp.mag;
     if (stepT < 0) { stepT = 0.32; sfx.step(); }
   }
+  if (!moving) { autoCam.ctrlYaw = null; autoCam.following = false; autoCam.t = 0; } // stopping restarts the wait
   pushOut(player);
   player.y = groundY(player.x, player.z);
   kid.root.position.set(player.x, player.y, player.z);
@@ -839,4 +880,4 @@ requestAnimationFrame(() => setTimeout(async () => {
 }, 30));
 
 // handy for testing from the console
-window.__game = { save, sky, player, W, kids, get mode() { return mode; }, enterShop, enterHaunted, renderer, scene, camera, get action() { return currentAction; }, doAction, haunted };
+window.__game = { save, sky, player, cam, autoCam, W, kids, get mode() { return mode; }, enterShop, enterHaunted, renderer, scene, camera, get action() { return currentAction; }, doAction, haunted };
