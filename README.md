@@ -13,11 +13,13 @@ Open the GitHub Pages link on the tablet, then **Share → Add to Home Screen** 
 | Drag on the left half | Walk (joystick appears under your thumb) |
 | Drag on the right half | Turn the camera |
 | Orange button | Knock, enter, go shopping, BOO! |
-| Purple button | Jump |
+| Purple button ⤴ | Jump (works while running, too) |
+| Blue button ⚡ | Hold for a speed boost |
+| Pink button 🌀 | 360 power spin jump |
 | Kid button (top right) | Switch between Carter and Jack (the other brother follows along) |
 | 🌅 ☀️ 🌇 🌙 | Skip ahead: morning → noon → golden hour → night |
 
-Keyboard also works: WASD/arrows to walk, Q/E to turn, Space to jump, Enter to use the orange button.
+Keyboard also works: WASD/arrows to walk, Q/E to turn, Space to jump, Shift to boost, R to spin, Enter to use the orange button.
 
 ### The loop
 - **Trick-or-treat:** every glowing door gives 2–4 candy once per night. A full day (morning, noon, golden hour, night) takes 12 minutes; each time night falls the doors glow again.

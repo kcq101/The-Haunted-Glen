@@ -204,7 +204,8 @@ if (dot(uOn, vec4(1.0)) > 0.0) {
     const find = (re) => clips.find((c) => re.test(c.name));
     const walkClip = find(/^walking$/i) || find(/walk/i);
     const runClip = find(/^running$/i) || find(/run/i);
-    this.extra = clips.filter((c) => c !== walkClip && c !== runClip);
+    const spinClip = find(/spin/i);
+    this.extra = clips.filter((c) => c !== walkClip && c !== runClip && c !== spinClip);
 
     // Idle: arms hanging from the walk's "passing" frame, everything else in
     // the rest pose so the legs stand straight.
@@ -216,7 +217,68 @@ if (dot(uOn, vec4(1.0)) > 0.0) {
     };
     for (const a of Object.values(this.actions)) if (a) { a.play(); a.setEffectiveWeight(0); }
     this.actions.idle.setEffectiveWeight(1);
+    if (spinClip) this._setupSpin(spinClip);
     mixer.update(0);
+  }
+
+  // The spin jump carries the hips ~1.5 m forward inside the clip. Measure that
+  // travel (in the kid's body space), then pin the hips' x/z so the game can
+  // move the kid along instead — otherwise he'd snap back when it ends.
+  _setupSpin(clip) {
+    clip = clip.clone();
+    const hipName = this.bones.Hips.name;
+    const track = clip.tracks.find((t) => t.name === `${hipName}.position`);
+    const N = 48;
+    this.spinFwd = new Float32Array(N + 1);
+    {
+      const m = new THREE.AnimationMixer(this.root);
+      const a = m.clipAction(clip).play();
+      const p = new THREE.Vector3(), body = this.root.parent || this.root;
+      let z0 = 0;
+      for (let i = 0; i <= N; i++) {
+        a.time = (i / N) * clip.duration; m.update(0);
+        this.root.updateMatrixWorld(true);
+        this.bones.Hips.getWorldPosition(p);
+        if (this.root.parent) body.worldToLocal(p);
+        if (i === 0) z0 = p.z;
+        this.spinFwd[i] = p.z - z0;
+      }
+      m.stopAllAction(); m.uncacheRoot(this.root);
+      this.mesh.skeleton.pose();
+    }
+    if (track) {
+      const v = track.values, x0 = v[0], z0 = v[2];
+      for (let i = 0; i < v.length; i += 3) { v[i] = x0; v[i + 2] = z0; }
+    }
+    const a = this.mixer.clipAction(clip);
+    a.setLoop(THREE.LoopOnce, 1);
+    a.clampWhenFinished = true;
+    this.actions.spin = a;
+    this.spinDur = clip.duration;
+    this.spinT = -1;
+  }
+
+  get canSpin() { return !!this.actions.spin; }
+  get spinning() { return this.spinT >= 0; }
+
+  startSpin(rate = 1.5) {
+    if (!this.actions.spin || this.spinning) return false;
+    this.spinRate = rate;
+    this.spinT = 0;
+    this.spinPrev = 0;
+    const a = this.actions.spin;
+    a.reset(); a.timeScale = rate; a.setEffectiveWeight(0); a.play();
+    return true;
+  }
+
+  // forward travel (body units) between the clip's previous and current time
+  _spinAdvance() {
+    const N = this.spinFwd.length - 1;
+    const f = Math.min(1, this.spinT / this.spinDur) * N, i = Math.min(N - 1, Math.floor(f));
+    const z = this.spinFwd[i] + (this.spinFwd[i + 1] - this.spinFwd[i]) * (f - i);
+    const d = z - this.spinPrev;
+    this.spinPrev = z;
+    return d;
   }
 
   _makeIdle(walkClip) {
@@ -251,18 +313,30 @@ if (dot(uOn, vec4(1.0)) > 0.0) {
     return new THREE.AnimationClip('idle', -1, tracks);
   }
 
-  // speed01: 0 standing … 1 full joystick
-  update(dt, speed01) {
-    const { idle, walk, run } = this.actions;
+  // speed01: 0 standing … 1 full joystick; boost: 1 normal, >1 sprinting.
+  // Returns how far a spin jump moved the kid forward this frame.
+  update(dt, speed01, boost = 1) {
+    const { idle, walk, run, spin } = this.actions;
+    let sw = 0, adv = 0;
+    if (this.spinning) {
+      this.spinT += dt * this.spinRate;
+      const left = this.spinDur - this.spinT;
+      sw = Math.min(1, this.spinT / 0.12, Math.max(0, left) / 0.25);
+      adv = this._spinAdvance();
+      if (left <= 0) { this.spinT = -1; spin.stop(); sw = 0; }
+      else spin.setEffectiveWeight(sw);
+    }
+    const k = 1 - sw;
     const move = smooth(0.03, 0.2, speed01);
     const r = run ? smooth(0.55, 0.8, speed01) : 0;
-    idle.setEffectiveWeight(1 - move);
-    if (walk) { walk.setEffectiveWeight(move * (1 - r)); walk.timeScale = 0.75 + speed01 * 0.9; }
-    if (run) { run.setEffectiveWeight(move * r); run.timeScale = 0.8 + speed01 * 0.35; }
+    idle.setEffectiveWeight((1 - move) * k);
+    if (walk) { walk.setEffectiveWeight(move * (1 - r) * k); walk.timeScale = 0.75 + speed01 * 0.9; }
+    if (run) { run.setEffectiveWeight(move * r * k); run.timeScale = (0.8 + speed01 * 0.35) * boost; }
     this.mixer.update(dt);
     this._blink(dt);
     if (this.hideHead) this.bones.Head.scale.setScalar(0.001);
     else this.bones.Head.scale.setScalar(1);
+    return adv;
   }
 
   // a blink every few seconds, sometimes a double blink

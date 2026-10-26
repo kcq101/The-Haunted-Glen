@@ -10,6 +10,8 @@ export class Controls {
     this.enabled = true;
     this.onAction = null;
     this.onJump = null;
+    this.onSpin = null;
+    this.boostTouch = false;
 
     this.base = document.getElementById('joy-base');
     this.knob = document.getElementById('joy-knob');
@@ -23,6 +25,7 @@ export class Controls {
       if (e.repeat) return;
       this.keys.add(e.code);
       if (e.code === 'Space') { this.onJump?.(); e.preventDefault(); }
+      if (e.code === 'KeyR') this.onSpin?.();
       if (e.code === 'Enter' || e.code === 'KeyF') this.onAction?.();
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
@@ -82,6 +85,7 @@ export class Controls {
     this.move.x = this.move.y = 0;
     this.look.dx = this.look.dy = 0;
     this.base.style.display = 'none';
+    this.boostTouch = false;
     this.keys.clear();
   }
 
@@ -97,6 +101,9 @@ export class Controls {
     if (L > 1) { x /= L; y /= L; }
     return { x, y, mag: Math.min(1, L) };
   }
+
+  // speed boost: held on the ⚡ button, or Shift on a keyboard
+  get boost() { return this.boostTouch || this.keys.has('ShiftLeft') || this.keys.has('ShiftRight'); }
 
   consumeLook() {
     let dx = this.look.dx, dy = this.look.dy;

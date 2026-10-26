@@ -81,10 +81,18 @@ button { font-family: inherit; cursor: pointer; border: none; color: inherit; }
 .action-btn:active, .jump-btn:active, .swap-btn:active, .big-btn:active, .shop-btn:active { transform: translateY(3px); box-shadow: none; }
 .action-icon { font-size: 40px; line-height: 1; }
 .action-label { font-weight: 900; font-size: 18px; color: #3a1a06; margin-top: 2px; white-space: nowrap; }
-.jump-btn {
-  width: 72px; height: 72px; border-radius: 50%; font-size: 34px; font-weight: 900; color: white;
-  background: radial-gradient(circle at 35% 30%, #9a7ae8, var(--purple)); box-shadow: 0 5px 0 var(--purple-dark);
+/* Jump + Boost on top, Spin centered underneath */
+.move-btns { display: grid; grid-template-columns: 62px 62px; grid-template-rows: 62px 62px; column-gap: 12px; row-gap: 6px; }
+.move-btn {
+  width: 62px; height: 62px; border-radius: 50%; font-size: 30px; font-weight: 900; color: white; line-height: 1;
+  display: grid; place-items: center; touch-action: none; -webkit-tap-highlight-color: transparent;
+  border: 3px solid rgba(255, 255, 255, 0.35);
 }
+.move-btn.pressed, .move-btn.held, .move-btn:active { transform: translateY(3px); box-shadow: none; }
+.jump-btn { grid-column: 1; grid-row: 1; background: radial-gradient(circle at 35% 30%, #9a7ae8, var(--purple)); box-shadow: 0 5px 0 var(--purple-dark); }
+.boost-btn { grid-column: 2; grid-row: 1; font-size: 28px; background: radial-gradient(circle at 35% 30%, #7cc0ff, #2a7de0 60%, #1b5bb0); box-shadow: 0 5px 0 #0f3a75; }
+.boost-btn.held { box-shadow: 0 0 22px rgba(255, 220, 80, 0.9); }
+.spin-btn { grid-column: 1 / span 2; grid-row: 2; justify-self: center; background: radial-gradient(circle at 35% 30%, #ff9be0, #d93fa8 60%, #a3237c); box-shadow: 0 5px 0 #66104c; }
 @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
 
 #toast {

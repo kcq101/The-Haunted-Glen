@@ -73,6 +73,8 @@ export const sfx = {
   thunder() { noise(1.8, { vol: 0.5, freq: 120, q: 0.5, type: 'lowpass' }); },
   found() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.25, { type: 'triangle', vol: 0.16, delay: i * 0.08 })); },
   jump() { tone(300, 0.18, { type: 'sine', vol: 0.12, slide: 300 }); },
+  spin() { tone(260, 0.5, { type: 'sine', vol: 0.12, slide: 520 }); noise(0.45, { vol: 0.08, freq: 900, q: 0.8, delay: 0.05 }); [784, 988, 1319].forEach((f, i) => tone(f, 0.14, { type: 'triangle', vol: 0.1, delay: 1.25 + i * 0.06 })); },
+  boost() { noise(0.35, { vol: 0.1, freq: 700, q: 0.7 }); tone(220, 0.3, { type: 'triangle', vol: 0.06, slide: 220 }); },
   step() { noise(0.05, { vol: 0.05, freq: 400 + Math.random() * 300, q: 1 }); },
   splash() { noise(0.3, { vol: 0.12, freq: 1600, q: 1 }); },
 };

@@ -140,6 +140,7 @@ export class Kid {
     this.blinkT = 2;
     this.jumpV = 0;
     this.jumpY = 0;
+    this.twirlT = -1;
   }
 
   async loadModel(url) {
@@ -217,12 +218,13 @@ export class Kid {
     }
   }
 
-  update(dt, moving, speed01, time) {
+  // Returns forward travel from a spin jump this frame (0 otherwise).
+  update(dt, moving, speed01, time, boost = 1) {
     const target = moving ? speed01 : 0;
     this.speed += (target - this.speed) * Math.min(1, dt * 10);
-    this.walkPhase += dt * (6 + this.speed * 7) * (this.speed > 0.05 ? 1 : 0);
+    this.walkPhase += dt * (6 + this.speed * 7 * boost) * (this.speed > 0.05 ? 1 : 0);
     if (this.model) {
-      this.model.update(dt, this.speed);
+      const adv = this.model.update(dt, this.speed, boost);
       if (this.jumpY > 0 || this.jumpV > 0) {
         this.jumpV -= 18 * dt;
         this.jumpY = Math.max(0, this.jumpY + this.jumpV * dt);
@@ -231,7 +233,16 @@ export class Kid {
       this.body.position.y = this.jumpY;
       this.model.syncAnchors();
       this.animateCostume(time);
-      return;
+      return adv;
+    }
+    // stand-in kid: a quick twirl with a hop
+    let adv = 0;
+    if (this.twirlT >= 0) {
+      this.twirlT += dt;
+      const p = Math.min(1, this.twirlT / 0.9);
+      this.body.rotation.y = Math.PI * 2 * (p * p * (3 - 2 * p));
+      adv = 1.6 * dt / 0.9;
+      if (p >= 1) { this.twirlT = -1; this.body.rotation.y = 0; }
     }
     const sw = Math.sin(this.walkPhase) * 0.75 * this.speed;
     this.legs[0].rotation.x = sw;
@@ -254,6 +265,7 @@ export class Kid {
     if (this.blinkT < 0) this.blinkT = 2 + Math.random() * 3;
     this.eyes.forEach((e) => (e.scale.y = blink ? this.d.headR * 0.02 : this.d.headR * 0.17));
     this.animateCostume(time);
+    return adv;
   }
 
   animateCostume(time) {
@@ -271,6 +283,17 @@ export class Kid {
   }
 
   jump() {
-    if (this.jumpY === 0) this.jumpV = 5.5;
+    if (this.jumpY === 0 && !this.spinning) this.jumpV = 5.5;
+  }
+
+  get spinning() { return this.model ? this.model.spinning : this.twirlT >= 0; }
+
+  // the 360 power spin jump (or a twirl for the stand-in kid)
+  spin() {
+    if (this.spinning || this.jumpY > 0) return false;
+    if (this.model) return this.model.canSpin && this.model.startSpin(1.5);
+    this.twirlT = 0;
+    this.jumpV = 5;
+    return true;
   }
 }

@@ -652,9 +652,30 @@ function swapKid() {
 // ---------------------------------------------------------------------------
 const controls = new Controls($('touch-layer'));
 controls.onAction = () => doAction();
-controls.onJump = () => { if (mode === 'world') { kids[current].jump(); sfx.jump(); } };
+controls.onJump = () => { if (mode === 'world' && kids[current].jumpY === 0 && !kids[current].spinning) { kids[current].jump(); sfx.jump(); } };
+controls.onSpin = () => {
+  if (mode !== 'world' || player.busy > 0) return;
+  if (kids[current].spin()) {
+    sfx.spin();
+    setTimeout(() => { if (mode === 'world') kids[other()].spin(); }, 350); // little brother copies
+  }
+};
 $('btn-action').addEventListener('click', () => doAction());
-$('btn-jump').addEventListener('click', () => controls.onJump());
+// Jump / Spin / Boost react the moment a finger lands (a "click" gets dropped
+// on phones and tablets while the other thumb is on the joystick).
+const pressBtn = (el, fn) => el.addEventListener('pointerdown', (e) => {
+  e.preventDefault(); e.stopPropagation(); initAudio(); fn();
+  el.classList.add('pressed'); setTimeout(() => el.classList.remove('pressed'), 120);
+});
+pressBtn($('btn-jump'), () => controls.onJump());
+pressBtn($('btn-spin'), () => controls.onSpin());
+{
+  const b = $('btn-boost');
+  const on = (e) => { e.preventDefault(); e.stopPropagation(); initAudio(); try { b.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ } if (!controls.boostTouch) sfx.boost(); controls.boostTouch = true; b.classList.add('held'); };
+  const off = () => { controls.boostTouch = false; b.classList.remove('held'); };
+  b.addEventListener('pointerdown', on);
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, off);
+}
 $('btn-swap').addEventListener('click', () => swapKid());
 $('btn-time').addEventListener('click', () => { initAudio(); const ph = sky.next(); sfx.click(); toast(`${ph.icon} ${ph.label}`, 1.6); });
 $('btn-sound').addEventListener('click', () => {
@@ -662,7 +683,7 @@ $('btn-sound').addEventListener('click', () => {
   setMuted(!isMuted());
   $('btn-sound').textContent = isMuted() ? '🔇' : '🔊';
 });
-for (const b of [$('btn-action'), $('btn-jump'), $('btn-swap'), $('btn-time'), $('btn-sound')]) {
+for (const b of [$('btn-action'), $('btn-jump'), $('btn-spin'), $('btn-boost'), $('btn-swap'), $('btn-time'), $('btn-sound')]) {
   b.addEventListener('pointerdown', (e) => e.stopPropagation());
 }
 
@@ -703,6 +724,9 @@ const dayWin = new THREE.Color('#5d6b80'), nightWin = new THREE.Color('#ffd28a')
 const dayLamp = new THREE.Color('#d8d0b8'), nightLamp = new THREE.Color('#ffffff').multiplyScalar(1.9);
 const dayShop = new THREE.Color('#ffd9a0'), nightShop = new THREE.Color('#ffc070').multiplyScalar(1.7);
 let stepT = 0;
+const BOOST = 1.6; // ⚡ speed boost
+const BOOST_ANIM = 1.45; // run cycle speed-up to match
+const AIR_LEAP = 1.2; // extra forward speed while in the air
 const PITCH_LOW = 0.12; // lowest orbit angle behind the kid
 
 // --- auto camera ------------------------------------------------------------
@@ -734,8 +758,12 @@ function updateWorld(dt) {
   else autoCam.pause = Math.max(0, autoCam.pause - dt);
 
   let moving = false;
-  const speed = CHARACTERS[current].speed;
+  const spinning = kid.spinning;
+  const boosting = controls.boost && inp.mag > 0.02 && !spinning;
+  const airLeap = kid.jumpY > 0 ? AIR_LEAP : 1; // a jump while running carries them a bit further
+  const speed = CHARACTERS[current].speed * (boosting ? BOOST : 1) * airLeap;
   if (player.busy > 0) player.busy -= dt;
+  else if (spinning) { /* the spin carries them forward on its own (below) */ }
   else if (inp.mag > 0.02) {
     // camera-relative movement. While the stick is held, steer relative to
     // where the camera was when they started, so an auto-pan doesn't curve
@@ -774,15 +802,22 @@ function updateWorld(dt) {
       cam.yaw += turn;
       cam.pitch += (AUTO_CAM.pitch - cam.pitch) * Math.min(1, dt * 0.6 * ease);
     }
-    stepT -= dt * inp.mag;
-    if (stepT < 0) { stepT = 0.32; sfx.step(); }
+    stepT -= dt * inp.mag * (boosting ? BOOST : 1);
+    if (stepT < 0) { stepT = 0.32; if (kid.jumpY === 0) sfx.step(); }
   }
   if (!moving) { autoCam.ctrlYaw = null; autoCam.following = false; autoCam.t = 0; } // stopping restarts the wait
   pushOut(player);
   player.y = groundY(player.x, player.z);
   kid.root.position.set(player.x, player.y, player.z);
   kid.root.rotation.y = player.yaw;
-  kid.update(dt, moving, inp.mag, time);
+  const spinAdv = kid.update(dt, moving, inp.mag, time, boosting ? BOOST_ANIM : 1);
+  if (spinAdv) {
+    player.x += Math.sin(player.yaw) * spinAdv;
+    player.z += Math.cos(player.yaw) * spinAdv;
+    pushOut(player);
+    player.y = groundY(player.x, player.z);
+    kid.root.position.set(player.x, player.y, player.z);
+  }
 
   // big brother / little brother follows along
   const fk = kids[other()];
@@ -794,7 +829,7 @@ function updateWorld(dt) {
     // teleport if left far behind (e.g. after a door)
     follower.x = behindX; follower.z = behindZ;
   } else if (fd > 0.6) {
-    const sp = Math.min(speed * 1.05, fd * 3);
+    const sp = Math.min(speed * 1.05, fd * 3) * (fk.spinning ? 0.4 : 1);
     follower.x += (fdx / fd) * sp * dt; follower.z += (fdz / fd) * sp * dt;
     follower.yaw = Math.atan2(fdx, fdz);
     fMoving = true;
@@ -808,7 +843,7 @@ function updateWorld(dt) {
   follower.y = groundY(follower.x, follower.z);
   fk.root.position.set(follower.x, follower.y, follower.z);
   fk.root.rotation.y = follower.yaw;
-  fk.update(dt, fMoving, Math.min(1, fd / 2), time + 1.3);
+  fk.update(dt, fMoving, Math.min(1, fd / 2), time + 1.3, boosting && fMoving ? BOOST_ANIM : 1);
 
   // day / night
   const prevT = sky.t;
@@ -1006,7 +1041,7 @@ function frame(now) {
     btn.classList.remove('hidden');
   } else btn.classList.add('hidden');
   currentAction = a;
-  $('btn-jump').classList.toggle('hidden', mode !== 'world');
+  $('move-btns').classList.toggle('hidden', mode !== 'world');
 }
 
 // ---------------------------------------------------------------------------
