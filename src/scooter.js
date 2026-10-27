@@ -10,8 +10,8 @@ import { GLTFLoader } from '../lib/addons/loaders/GLTFLoader.js';
 // ---------------------------------------------------------------------------
 
 export const SCOOTER_WHEEL = 'assets/models/scooter_wheel.glb';
-const WHEEL_R_MODEL = 0.952;
-export const SHIFT = 0.45; // how far (as a share of the left foot's offset) the scooter sits toward the kid's left // radius of the wheel model as it comes from Meshy
+const WHEEL_R_MODEL = 0.952; // radius of the wheel model as it comes from Meshy
+export const SHIFT = 0.45; // how far (as a share of the left foot's offset) the scooter sits toward the kid's left
 
 export const SCOOTERS = {
   blue: {

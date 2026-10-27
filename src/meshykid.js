@@ -420,12 +420,17 @@ if (dot(uOn, vec4(1.0)) > 0.0) {
     _pole.copy(_fwd).addScaledVector(_upv, -0.2);
     // left foot in the middle of the deck (the deck sits a little to his left)
     footL.addScaledVector(_side, (this.d.footX || 0) * (1 - (this.deckShift ?? 0.45)));
+    footL.addScaledVector(_upv, FOOT_LIFT); // sole just on top of the deck, not sunk into it
+    B.LeftFoot.getWorldQuaternion(_footQ); // keep the foot flat on the deck
     if (amt > 0) {
       // bend the standing knee so the right foot can reach the road
       this.root.position.y = this.baseY - amt * leg * 0.3;
       this.root.updateMatrixWorld(true);
     }
     solve2(B.LeftUpLeg, B.LeftLeg, B.LeftFoot, footL, _pole);
+    B.LeftFoot.parent.getWorldQuaternion(_q3);
+    B.LeftFoot.quaternion.copy(_q3.invert().multiply(_footQ));
+    B.LeftFoot.updateMatrixWorld(true);
     // Right foot: hangs off the side of the deck, a little low and back;
     // on a kick it drops to the road beside the deck and sweeps back to push.
     const ground = this.rideGround || 0;
@@ -496,6 +501,8 @@ function noScale(m) {
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _e = new THREE.Vector3();
 const _pole = new THREE.Vector3(), _axis = new THREE.Vector3();
+const _footQ = new THREE.Quaternion();
+const FOOT_LIFT = 0.03; // meters the standing foot sits up on the scooter deck
 const _fwd = new THREE.Vector3(), _upv = new THREE.Vector3(), _fl = new THREE.Vector3(), _fr = new THREE.Vector3(), _t = new THREE.Vector3(), _side = new THREE.Vector3(), _bq = new THREE.Quaternion();
 const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
 

@@ -669,13 +669,13 @@ function swapKid() {
 // --- scooters ----------------------------------------------------------------
 const ride = { on: false, v: 0, busy: false };
 const SCOOT = {
-  top: 1.45, // top speed vs. running
-  boost: 1.3, // ⚡ on a scooter
-  accel: 6.5, // m/s² while pushing
+  top: 2.0, // top speed vs. running (11.2 m/s, ~25% faster than a boosted run)
+  boost: 1.5, // ⚡ on a scooter (16.8 m/s, almost twice a boosted run)
+  accel: 10, // m/s² while pushing (about a second to full speed)
   coast: 1.6, // slows this much (m/s²) when you let go
   brake: 9, // pulling back on the stick
   turn: 3.4, // radians per second at low speed…
-  turnFast: 2.2, // …and at top speed
+  turnFast: 2.6, // …and at top speed
 };
 async function setScooter(on) {
   if (ride.busy) return;
