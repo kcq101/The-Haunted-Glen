@@ -667,6 +667,7 @@ export class HauntedHouse {
       const d = Math.hypot(gh.x - this.p.x, gh.y - this.p.y);
       if (d < 3.4) {
         gh.state = 'scared';
+        sfx.poof();
         gh.t = 0;
         gh.fx = (gh.x - this.p.x) / (d || 1);
         gh.fy = (gh.y - this.p.y) / (d || 1);
@@ -705,8 +706,10 @@ export class HauntedHouse {
       if (!this.collides(p.x, ny)) p.y = ny;
       if (Math.abs(mx) > Math.abs(my)) p.dir = mx > 0 ? 'right' : 'left';
       else p.dir = my > 0 ? 'down' : 'up';
+      const stepBefore = Math.floor(p.anim / 2);
       p.anim += dt * 8;
       p.frame = 1 + (Math.floor(p.anim) % 2);
+      if (Math.floor(p.anim / 2) !== stepBefore) sfx.step('wood'); // creaky floorboards
     } else p.frame = 0;
 
     // stairs
@@ -717,6 +720,7 @@ export class HauntedHouse {
       p.x = to.stairs.arrive.x; p.y = to.stairs.arrive.y; p.dir = 'down';
       this.fade = 1;
       this.setupGhosts();
+      sfx.stairs();
       sfx.creak();
       this.roomName = '';
     }
@@ -731,6 +735,7 @@ export class HauntedHouse {
       if (Math.hypot(c.x - p.x, c.y - (p.y - 0.3)) < 0.8) {
         this.save.found.push(c.id);
         sfx.found();
+        sfx.sparkle();
         this.popups.push({ text: '🌽 Golden Candy Corn!', x: c.x, y: c.y - 1.2, t: 0, color: '#ffd23f' });
         this.cb.onCorn(this.save.found.length);
       }
@@ -745,6 +750,8 @@ export class HauntedHouse {
         if (gh.state === 'hidden') {
           const dh = Math.hypot(gh.hx - p.x, gh.hy - p.y);
           gh.rattle = dh < 4.5 && gh.cd <= 0 ? Math.sin(this.time * 40) * (Math.sin(this.time * 3 + gh.hx) > 0.3 ? 1 : 0) : 0;
+          gh.rsnd = (gh.rsnd || 0) - dt;
+          if (gh.rattle && gh.rsnd <= 0) { sfx.rattle(); gh.rsnd = 0.7; } // the closet shakes
           if (dh < 1.7 && gh.cd <= 0) {
             gh.state = 'pop'; gh.t = 0; gh.x = gh.hx; gh.y = gh.hy - 0.3;
             this.shake = 0.45;
@@ -770,6 +777,8 @@ export class HauntedHouse {
           if (d < 6 && d > 1.3) { gh.x += ((p.x - gh.x) / d) * dt * 0.8; gh.y += ((p.y - gh.y) / d) * dt * 0.8; }
           if (Math.random() < dt * 0.2) { gh.vx = (Math.random() - 0.5) * 1.6; gh.vy = (Math.random() - 0.5) * 1.6; }
           gh.alpha = 0.45 + Math.sin(this.time * 1.5 + gh.x) * 0.25;
+          gh.wt = (gh.wt === undefined ? 2 + Math.random() * 4 : gh.wt) - dt;
+          if (gh.wt < 0) { gh.wt = 7 + Math.random() * 8; if (d < 9) sfx.whoo(); } // a friendly "whooo" when one drifts close
           if (d < 1.2 && gh.cd <= 0) {
             gh.cd = 12;
             this.shake = 0.25;
@@ -778,6 +787,22 @@ export class HauntedHouse {
           }
         }
       }
+    }
+
+    // furniture that makes noise when you walk near it
+    this.fx = this.fx || {};
+    for (const fu of this.floor.furniture) {
+      const kind = fu.t;
+      if (kind !== 'piano' && kind !== 'fireplace' && kind !== 'cauldron' && kind !== 'clock') continue;
+      const key = `${this.floor.name}:${kind}:${fu.x},${fu.y}`;
+      const dist = Math.hypot(fu.x + fu.w / 2 - p.x, fu.y + fu.h / 2 - p.y);
+      const reach = kind === 'piano' ? 5 : kind === 'clock' ? 3.5 : 4.5;
+      this.fx[key] = (this.fx[key] ?? 0.5 + Math.random()) - dt;
+      if (dist > reach || this.fx[key] > 0) continue;
+      if (kind === 'piano') { sfx.piano(); this.fx[key] = 24 + Math.random() * 10; }
+      else if (kind === 'fireplace') { sfx.crackle(); this.fx[key] = 0.25 + Math.random() * 0.9; }
+      else if (kind === 'cauldron') { sfx.cauldron(); this.fx[key] = 0.5 + Math.random() * 1.2; }
+      else { sfx.clock(); this.fx[key] = 1; }
     }
 
     // spooky atmosphere

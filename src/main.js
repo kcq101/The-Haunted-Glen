@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { litMat, HIGH, setQuality } from './quality.js';
 import { CHARACTERS, BOUNDS, px, HOME_ID, STORE } from './config.js';
-import { createTerrain, storePos, setElevation } from './terrain.js';
+import { createTerrain, storePos, setElevation, onRoad, isInWoods, creekLine } from './terrain.js';
 import { makeHouseSpecs, groundMarks, buildHouses } from './houses.js';
 import { Builder } from './builder.js';
 import { createTrees, createFallingLeaves } from './nature.js';
@@ -17,10 +17,10 @@ import { ITEM } from './costumes.js';
 import { loadCostumeData } from './costumefit.js';
 import { initFitTuner } from './fittuner.js';
 import { HauntedHouse, CORN_TOTAL, CORN_REWARDS } from './haunted2d.js';
-import { initAudio, sfx, setMuted, isMuted, updateAmbient } from './audio.js';
+import { initAudio, sfx, setMuted, isMuted, updateAmbient, setArea, setRoll, setCreek } from './audio.js';
 import { loadSave, writeSave } from './save.js';
 import { preloadScooters } from './scooter.js';
-import { clamp } from './util.js';
+import { clamp, polylineDistance } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 const pick = (arr) => arr[(Math.random() * arr.length) | 0];
@@ -219,6 +219,20 @@ function groundY(x, z) {
   return y;
 }
 
+// What's underfoot, for footstep sounds: wood (footbridge), road, leaf (woods) or grass.
+function surfaceAt(x, z) {
+  const br = W.bridge;
+  if (br) {
+    const dx = x - br.x, dz = z - br.z;
+    const along = dx * Math.sin(br.ang) + dz * Math.cos(br.ang);
+    const across = dx * Math.cos(br.ang) - dz * Math.sin(br.ang);
+    if (Math.abs(along) < br.len / 2 && Math.abs(across) < br.halfW) return 'wood';
+  }
+  if (onRoad(x, z)) return 'road';
+  if (isInWoods(x, z)) return 'leaf';
+  return 'grass';
+}
+
 // ---------------------------------------------------------------------------
 // UI helpers
 // ---------------------------------------------------------------------------
@@ -235,6 +249,7 @@ let bubbleTimer = 0;
 function bubble(name, text, secs = 3.2) {
   $('bubble-name').textContent = name;
   $('bubble-text').textContent = text;
+  sfx.babble(text.length, true);
   const el = $('bubble');
   el.classList.remove('hidden');
   el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
@@ -315,7 +330,7 @@ function doAction() {
   const a = currentAction;
   if (a.kind === 'boo' || a.kind === 'exit') { haunted.action(); return; }
   if (a.kind === 'knock') knock(a.door);
-  else if (a.kind === 'knocked') bubble('Neighbor', pick(["We already gave you candy! Come back next night!", 'See you next round, trick-or-treater!']));
+  else if (a.kind === 'knocked') sfx.notYet(), bubble('Neighbor', pick(["We already gave you candy! Come back next night!", 'See you next round, trick-or-treater!']));
   else if (a.kind === 'haunted') enterHaunted();
   else if (a.kind === 'shop') enterShop();
 }
@@ -337,6 +352,7 @@ function knock(door) {
     const kid = CHARACTERS[current];
     const outfit = kids[current].costume.outfit && ITEM[kids[current].costume.outfit];
     const line = outfit && Math.random() < 0.6 ? `Wow, a ${outfit.name}! Here's some candy!` : pick(NEIGHBOR_LINES)(kid.name);
+    sfx.doorOpen();
     bubble('Neighbor', line);
     const n = 2 + ((Math.random() * 3) | 0);
     save.candy += n;
@@ -363,6 +379,7 @@ function enterHaunted() {
   sfx.door();
   fadeTo(() => {
     mode = 'haunted';
+    setArea('haunted');
     controls.reset();
     ride.v = 0;
     hideToast();
@@ -393,6 +410,7 @@ function enterHaunted() {
 function leaveHaunted() {
   fadeTo(() => {
     mode = 'world';
+    setArea('world');
     controls.reset();
     $('haunted').classList.add('hidden');
     canvas.classList.remove('hidden');
@@ -413,7 +431,7 @@ function showReward(itemId) {
   $('reward-title').textContent = `You won the ${it.name}!`;
   $('reward-text').textContent = 'Wear it from Hares Hill Halloween Emporium — it\'s free for brave ghost hunters!';
   $('reward').classList.remove('hidden');
-  sfx.chime();
+  sfx.fanfare();
 }
 $('reward-ok').addEventListener('click', () => $('reward').classList.add('hidden'));
 
@@ -429,12 +447,15 @@ function hazelSay(text) {
   $('hazel-text').textContent = text;
   const el = $('hazel');
   el.classList.remove('say'); void el.offsetWidth; el.classList.add('say');
+  sfx.babble(text.length);
 }
 
 function enterShop() {
   sfx.door();
+  setTimeout(() => sfx.bell(), 250);
   fadeTo(() => {
     mode = 'shop';
+    setArea('shop');
     controls.reset();
     controls.enabled = false;
     hideToast();
@@ -456,8 +477,10 @@ function enterShop() {
 
 function leaveShop() {
   revertPreview();
+  sfx.bell();
   fadeTo(() => {
     mode = 'world';
+    setArea('world');
     camera.clearViewOffset();
     camera.fov = 55;
     camera.updateProjectionMatrix();
@@ -492,7 +515,7 @@ function setShopPage(i) {
   const next = (i + n) % n;
   if (next === shopPage) return;
   shopPage = next;
-  sfx.click();
+  sfx.swish();
   setShopTargets();
   renderShop();
 }
@@ -537,11 +560,12 @@ function renderShop() {
 
 function tryOn(it) {
   initAudio();
-  sfx.click();
   const kid = kids[current];
   const slot = it.slot;
   const owned = save.owned.includes(it.id);
   const taking = owned && save.outfits[current][slot] === it.id;
+  if (taking) sfx.takeOff(); else sfx.tryOn();
+  if (!taking && !owned && !it.reward && save.candy < it.cost) setTimeout(() => sfx.deny(), 220);
   revertPreview();
   if (taking) {
     kid.setCostume({ ...kid.costume, [slot]: null });
@@ -584,7 +608,7 @@ $('shop-buy').addEventListener('click', () => {
   save.outfits[current][preview.slot] = it.id;
   writeSave(save);
   preview = null;
-  sfx.chime();
+  sfx.buy();
   W.interior.hazel.userData.cheer();
   if (kids[current].jumpY === 0) kids[current].jumpV = 4.5;
   hazelSay(pick(HAZEL_LINES.buy));
@@ -634,6 +658,7 @@ window.addEventListener('pointerup', (e) => {
 function swapKid() {
   initAudio();
   if (mode === 'shop') {
+    sfx.swap();
     revertPreview();
     current = other();
     setShopTargets();
@@ -652,7 +677,7 @@ function swapKid() {
   save.current = current;
   writeSave(save);
   updateSwapButton();
-  sfx.jump();
+  sfx.swap();
   if (mode === 'haunted') {
     // keep the same spot, just change who is walking
     const p = { ...haunted.p };
@@ -681,7 +706,7 @@ async function setScooter(on) {
   if (ride.busy) return;
   ride.busy = true;
   $('btn-scooter').classList.toggle('on', on);
-  if (on) toast('🛴 Scooter time!', 1.6);
+  if (on) { toast('🛴 Scooter time!', 1.6); sfx.scooterOn(); } else sfx.scooterOff();
   const ok = await kids[current].setRiding(on);
   await kids[other()].setRiding(on);
   ride.busy = false;
@@ -723,7 +748,7 @@ controls.onScooter = () => { if (mode === 'world') setScooter(!ride.on); };
   for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) b.addEventListener(ev, off);
 }
 $('btn-swap').addEventListener('click', () => swapKid());
-$('btn-time').addEventListener('click', () => { initAudio(); const ph = sky.next(); sfx.click(); toast(`${ph.icon} ${ph.label}`, 1.6); });
+$('btn-time').addEventListener('click', () => { initAudio(); const ph = sky.next(); sfx.timeSkip(); toast(`${ph.icon} ${ph.label}`, 1.6); });
 $('btn-sound').addEventListener('click', () => {
   initAudio();
   setMuted(!isMuted());
@@ -740,10 +765,13 @@ document.querySelectorAll('.pick-card').forEach((card) => {
     document.querySelectorAll('.pick-card').forEach((c) => c.classList.remove('selected'));
     card.classList.add('selected');
     current = card.dataset.kid;
+    initAudio(); // the title screen gets its song as soon as someone taps a brother
+    sfx.click();
   });
 });
 $('play-btn').addEventListener('click', () => {
   initAudio();
+  sfx.start();
   save.current = current;
   writeSave(save);
   $('title').classList.add('hidden');
@@ -770,6 +798,7 @@ const dayWin = new THREE.Color('#5d6b80'), nightWin = new THREE.Color('#ffd28a')
 const dayLamp = new THREE.Color('#d8d0b8'), nightLamp = new THREE.Color('#ffffff').multiplyScalar(1.9);
 const dayShop = new THREE.Color('#ffd9a0'), nightShop = new THREE.Color('#ffc070').multiplyScalar(1.7);
 let stepT = 0;
+const audioBits = { bumpCd: 0, wasAir: false, wasSpin: false, wasPush: false, peak: 0, creekT: 0 };
 const BOOST = 1.6; // ⚡ speed boost
 const BOOST_ANIM = 1.45; // run cycle speed-up to match
 const AIR_LEAP = 1.2; // extra forward speed while in the air
@@ -849,7 +878,10 @@ function updateWorld(dt) {
       pushOut(player);
       // bumping into a wall or tree slows you down
       const want = ride.v * dt, got = Math.hypot(player.x - ox, player.z - oz);
-      if (want > 1e-4 && got < want * 0.7) ride.v *= Math.max(0.2, got / want);
+      if (want > 1e-4 && got < want * 0.7) {
+        if (ride.v > 3 && audioBits.bumpCd <= 0) { sfx.bump(); audioBits.bumpCd = 0.6; }
+        ride.v *= Math.max(0.2, got / want);
+      }
       moving = ride.v > 0.4;
       if (!stick) { autoCam.ctrlYaw = null; }
     } else {
@@ -876,7 +908,7 @@ function updateWorld(dt) {
     }
     if (!riding) {
       stepT -= dt * inp.mag * (boosting ? BOOST : 1);
-      if (stepT < 0) { stepT = 0.32; if (kid.jumpY === 0) sfx.step(); }
+      if (stepT < 0) { stepT = 0.32; if (kid.jumpY === 0) sfx.step(surfaceAt(player.x, player.z)); }
     }
   }
   if (!moving) { autoCam.ctrlYaw = null; autoCam.following = false; autoCam.t = 0; } // stopping restarts the wait
@@ -885,6 +917,22 @@ function updateWorld(dt) {
   kid.root.position.set(player.x, player.y, player.z);
   kid.root.rotation.y = player.yaw;
   const spinAdv = kid.update(dt, moving && !riding, inp.mag, time, boosting ? BOOST_ANIM : 1);
+  // sounds that follow the body: landings, scooter kicks + wheels, the creek
+  audioBits.bumpCd -= dt;
+  const inAir = kid.jumpY > 0;
+  if (audioBits.wasAir && !inAir) { if (audioBits.wasSpin) sfx.spinLand(); else sfx.land(audioBits.peak > 0.7); audioBits.peak = 0; }
+  if (inAir) audioBits.peak = Math.max(audioBits.peak, kid.jumpY);
+  audioBits.wasAir = inAir;
+  audioBits.wasSpin = kid.spinning || (audioBits.wasSpin && inAir);
+  if (riding && kid.push && !audioBits.wasPush && kid.jumpY === 0) sfx.kick();
+  audioBits.wasPush = riding && kid.push;
+  setRoll(riding && kid.jumpY === 0 && ride.v > 0.4 ? Math.min(1, ride.v / (CHARACTERS[current].speed * SCOOT.top * SCOOT.boost)) : 0);
+  audioBits.creekT -= dt;
+  if (audioBits.creekT < 0) {
+    audioBits.creekT = 0.3;
+    const cd = polylineDistance(player.x, player.z, creekLine).d;
+    setCreek(clamp(1 - (cd - 2) / 20, 0, 1));
+  }
   if (spinAdv) {
     player.x += Math.sin(player.yaw) * spinAdv;
     player.z += Math.cos(player.yaw) * spinAdv;
@@ -924,7 +972,7 @@ function updateWorld(dt) {
   // day / night
   const prevT = sky.t;
   sky.update(dt, tmpV.set(player.x, player.y, player.z));
-  if (prevT < NIGHT_START && sky.t >= NIGHT_START && sky.t < NIGHT_START + 0.2) { save.nightNumber++; writeSave(save); refreshDoorGlows(); toast('Halloween night is here! The doors are glowing again. 🎃'); }
+  if (prevT < NIGHT_START && sky.t >= NIGHT_START && sky.t < NIGHT_START + 0.2) { save.nightNumber++; writeSave(save); refreshDoorGlows(); sfx.nightfall(); toast('Halloween night is here! The doors are glowing again. 🎃'); }
   const n = sky.night;
   mats.window.color.copy(dayWin).lerp(nightWin, n);
   mats.lamp.color.copy(dayLamp).lerp(nightLamp, n);

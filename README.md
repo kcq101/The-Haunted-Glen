@@ -56,7 +56,9 @@ src/meshykid.js       loads the Meshy boys: animation, bone anchors, outfit reco
 src/scooter.js        Meshy kick scooters + wheels (axle and grip spots for each model)
 src/haunted2d.js      the 2D haunted house
 src/kidsprites.js     Carter and Jack's pixel sprites (atlas, outfit recolor, costume spots)
-src/audio.js          sound effects (synthesized, no files needed)
+src/audio.js          music (crossfades by area) + synthesized sound effects and ambience
+assets/music/         the four songs: fun-fall-day (street, daytime), trick-or-treat-time (street, night),
+                      hip-halloween (Emporium), woooo (haunted house)
 lib/                  three.js r170 (bundled so it works offline)
 assets/               icons, and future models / sprites / music
 ```
@@ -70,7 +72,7 @@ Everything on the map is placed using pixel positions from the aerial screenshot
 - **Meshy models:** Carter and Jack are the rigged Meshy models in `assets/models/` (`src/meshykid.js`). They play idle, walk and run, costume pieces ride on the head, hand and spine bones, and outfits recolor the shirt, sleeves, pants and shoes. To swap in a new model, export from Meshy with animations as `.glb`, shrink the textures to 1024 px, and replace the file. The simple stand-in kid shows while a model downloads.
 - **Kid sprites in the haunted house:** the GPT sprite sheets live in `tools/sprite_src/`. Run `python3 tools/build_sprites.py` to cut them out, snap them to a real pixel grid (Carter 32 px, Jack 27 px tall), and write `assets/sprites/`. Costumes are drawn on top, and outfits recolor the shirt, pants and shoes. Open `tools/sprite_preview.html` on a local server to see every costume in every direction.
 - **Room tiles:** GPT pixel tiles at 16 px could replace the draw functions in `src/haunted2d.js` the same way.
-- **Theme music:** put an mp3 at `assets/music/theme.mp3`, and it plays automatically on a loop.
+- **Music:** four songs in `assets/music/` crossfade by where you are: *Fun Fall Day* on the street by day, *Trick or Treat Time* once night falls, *Hip Halloween* in the Emporium, and *Woooo* in the haunted house. Swap a file (same name) to change a song; edit `TRACKS` in `src/audio.js` to add one.
 
 ## Elevation
 
