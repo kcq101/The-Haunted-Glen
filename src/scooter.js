@@ -10,7 +10,8 @@ import { GLTFLoader } from '../lib/addons/loaders/GLTFLoader.js';
 // ---------------------------------------------------------------------------
 
 export const SCOOTER_WHEEL = 'assets/models/scooter_wheel.glb';
-const WHEEL_R_MODEL = 0.952; // radius of the wheel model as it comes from Meshy
+const WHEEL_R_MODEL = 0.952;
+export const SHIFT = 0.45; // how far (as a share of the left foot's offset) the scooter sits toward the kid's left // radius of the wheel model as it comes from Meshy
 
 export const SCOOTERS = {
   blue: {
@@ -81,6 +82,7 @@ export async function buildScooter(color, fit) {
 
   const outer = new THREE.Group(); // in the kid's body: +z forward, y=0 on the ground
   outer.rotation.y = Math.PI / 2; // model -x (front) -> +z
+  outer.position.x = (fit.footX || 0) * SHIFT; // the kid rides a little right of center; his left foot reaches in to the middle of the deck
   const inner = new THREE.Group();
   inner.scale.setScalar(s);
   inner.position.set(-kx * s, -ground * s, 0);

@@ -388,6 +388,7 @@ if (dot(uOn, vec4(1.0)) > 0.0) {
     // arms, for holding a scooter's handlebar
     const el = wp(this.bones.LeftForeArm), wr = wp(this.bones.LeftHand);
     d.arm = { upper: sh.distanceTo(el), fore: el.distanceTo(wr), shoulderY: sh.y, shoulderX: Math.abs(sh.x) };
+    d.footX = wp(this.bones.LeftFoot).x; // the left foot rides in the middle of the deck
     this.d = d;
   }
 
@@ -415,22 +416,25 @@ if (dot(uOn, vec4(1.0)) > 0.0) {
     const footL = B.LeftFoot.getWorldPosition(_fl), footR = B.RightFoot.getWorldPosition(_fr);
     const leg = B.LeftUpLeg.getWorldPosition(_a).distanceTo(footL);
     const amt = kick ? kick.amount : 0;
+    _side.set(-1, 0, 0).applyQuaternion(_bq); // the kid's right
+    _pole.copy(_fwd).addScaledVector(_upv, -0.2);
+    // left foot in the middle of the deck (the deck sits a little to his left)
+    footL.addScaledVector(_side, (this.d.footX || 0) * (1 - (this.deckShift ?? 0.45)));
     if (amt > 0) {
-      // bend the standing knee deep (foot stays put on the deck) so the
-      // other foot can reach the road
-      this.root.position.y = this.baseY - amt * leg * 0.32;
+      // bend the standing knee so the right foot can reach the road
+      this.root.position.y = this.baseY - amt * leg * 0.3;
       this.root.updateMatrixWorld(true);
-      _pole.copy(_fwd).addScaledVector(_upv, -0.2);
-      solve2(B.LeftUpLeg, B.LeftLeg, B.LeftFoot, footL, _pole);
-      // kicking foot: lands on the road just beside the deck, then sweeps back
-      _side.set(-1, 0, 0).applyQuaternion(_bq); // the kid's right
-      const back = leg * (0.95 * kick.phase - 0.1) * Math.min(1, amt * 1.6);
-      _t.copy(footR)
-        .addScaledVector(_side, 0.05 * amt)
-        .addScaledVector(_fwd, -back)
-        .addScaledVector(_upv, -kick.ground * amt);
-      solve2(B.RightUpLeg, B.RightLeg, B.RightFoot, _t, _pole);
     }
+    solve2(B.LeftUpLeg, B.LeftLeg, B.LeftFoot, footL, _pole);
+    // Right foot: hangs off the side of the deck, a little low and back;
+    // on a kick it drops to the road beside the deck and sweeps back to push.
+    const ground = this.rideGround || 0;
+    const back = leg * (0.08 + (0.95 * (kick ? kick.phase : 0) - 0.05) * Math.min(1, amt * 1.6));
+    _t.copy(footR)
+      .addScaledVector(_side, 0.03)
+      .addScaledVector(_fwd, -back)
+      .addScaledVector(_upv, -leg * 0.06 - ground * amt);
+    solve2(B.RightUpLeg, B.RightLeg, B.RightFoot, _t, _pole);
     // hands on the grips, elbows down and out
     for (const side of ['Left', 'Right']) {
       _pole.set(side === 'Left' ? 0.6 : -0.6, -1, -0.4).applyQuaternion(_bq);

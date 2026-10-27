@@ -161,7 +161,7 @@ export class Kid {
     if (on && !this.scooter && this.cfg.scooter) {
       if (!this.scooterLoading) {
         const H = this.cfg.height, a = this.d.arm;
-        const fit = a ? { shoulderY: a.shoulderY, shoulderX: a.shoulderX, reach: a.upper + a.fore } : { shoulderY: H * 0.62, shoulderX: H * 0.14, reach: H * 0.36 };
+        const fit = a ? { shoulderY: a.shoulderY, shoulderX: a.shoulderX, reach: a.upper + a.fore, footX: this.d.footX || 0 } : { shoulderY: H * 0.62, shoulderX: H * 0.14, reach: H * 0.36, footX: 0 };
         this.scooterLoading = buildScooter(this.cfg.scooter, fit).then((sc) => { this.scooter = sc; this.body.add(sc.group); }).catch((e) => console.warn("Couldn't load the scooter", e));
       }
       await this.scooterLoading;
@@ -299,6 +299,7 @@ export class Kid {
       if (riding) {
         this.body.updateMatrixWorld(true);
         const k = this.kickT >= 0 && this.kickT < KICK ? { amount: Math.sin((this.kickT / KICK) * Math.PI), phase: this.kickT / KICK, ground: this.scooter.deckH } : null;
+        this.model.rideGround = this.scooter.deckH;
         this.model.ride({ right: this.scooter.grips[0].getWorldPosition(_gr), left: this.scooter.grips[1].getWorldPosition(_gl) }, k);
       } else this.model.unride();
       this.model.syncAnchors();
