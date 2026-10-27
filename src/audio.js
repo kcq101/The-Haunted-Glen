@@ -17,27 +17,36 @@ let noiseBuf = null;
 // Music
 // ---------------------------------------------------------------------------
 const TRACKS = {
-  day: { src: 'assets/music/fun-fall-day.mp3', vol: 0.5 }, // walking the street, morning → golden hour
-  night: { src: 'assets/music/trick-or-treat-time.mp3', vol: 0.5 }, // trick-or-treat night
-  shop: { src: 'assets/music/hip-halloween.mp3', vol: 0.5 }, // Hares Hill Halloween Emporium
-  haunted: { src: 'assets/music/woooo.mp3', vol: 0.42 }, // inside the haunted house
+  fall: { src: 'assets/music/fun-fall-day.mp3', vol: 0.5 },
+  trick: { src: 'assets/music/trick-or-treat-time.mp3', vol: 0.5 },
+  hip: { src: 'assets/music/hip-halloween.mp3', vol: 0.5 },
+  woooo: { src: 'assets/music/woooo.mp3', vol: 0.42 },
 };
+// The songs take turns everywhere in the game, one after another.
+const PLAYLIST = ['fall', 'trick', 'hip', 'woooo'];
+// Give an area its own song here (add the file to TRACKS first), e.g.
+//   shop: 'hareshill', haunted: 'haunted'
+// Areas left out just keep the playlist going.
+const AREA_SONG = {};
 const tracks = {}; // name -> { el, gain, level, target }
 let area = 'world'; // world | shop | haunted
-let isNight = false;
+let listIdx = 0;
 let musicTimer = 0;
 
 function currentTrack() {
-  if (area === 'shop') return 'shop';
-  if (area === 'haunted') return 'haunted';
-  return isNight ? 'night' : 'day';
+  return AREA_SONG[area] || PLAYLIST[listIdx % PLAYLIST.length];
+}
+
+function nextSong() {
+  listIdx = (listIdx + 1) % PLAYLIST.length;
 }
 
 function makeTrack(name) {
   if (tracks[name]) return tracks[name];
   const el = new Audio(TRACKS[name].src);
-  el.loop = true;
+  el.loop = false; // when a song ends, the next one in the playlist takes over
   el.preload = 'auto';
+  el.addEventListener('ended', () => { if (!AREA_SONG[area] && currentTrack() === name) nextSong(); });
   let gain = null;
   try {
     // through Web Audio so the volume works on iPads (they ignore audio.volume)
@@ -85,6 +94,8 @@ function tickMusic(kick = false) {
   const want = currentTrack();
   for (const [name, t] of Object.entries(tracks)) {
     t.target = name === want ? TRACKS[name].vol : 0;
+    if (t.target > 0 && t.level <= 0.0005 && t.el.currentTime > 0.5) { try { t.el.currentTime = 0; } catch (e) { /* ignore */ } }
+    if (t.target > 0 && !AREA_SONG[area] && t.el.duration && t.el.duration - t.el.currentTime < 1.4 && !t.el.paused) nextSong();
     if (t.target > 0 && (t.el.paused || kick)) { const p = t.el.play(); if (p && p.catch) p.catch(() => {}); }
     // ease toward the target: ~1.2 s crossfade
     const step = dtS / 1.2 * TRACKS[name].vol;
@@ -353,9 +364,6 @@ export function updateAmbient(dt, night, indoors) {
   // wind is quieter inside; the creek and scooter beds only belong on the street
   ambient.gain.gain.value = indoors ? 0.02 : 0.05 + (1 - night) * 0.04;
   if (indoors) { setCreek(0); setRoll(0); return; }
-  // music follows the sky, with a little hysteresis so it doesn't flip-flop at dusk
-  if (!isNight && night > 0.6) isNight = true;
-  else if (isNight && night < 0.4) isNight = false;
 
   const a = ambient;
   const tick = (key, every, fn) => { a[key] -= dt; if (a[key] < 0) { a[key] = every(); fn(); } };
