@@ -45,6 +45,10 @@ src/store.js          Hares Hill Emporium outside, plus Hazel's lines
 src/shopinside.js     Inside the Emporium: shelf bays, front desk, tap targets, price tags
 src/hazel.js          Hazel the hare shopkeeper (model + animation)
 src/costumes.js       costume catalog (add new items here)
+src/costumefit.js     per-boy costume fit + drop-in GLB models / outfit prints
+src/fittuner.js       on-phone fit tuner (open the game with ?fit=1)
+data/costume_fit.json     fit tweaks for each piece on Carter and Jack
+data/costume_models.json  GPT/Meshy models and outfit prints that replace built-in pieces
 src/character.js      the kids + costume anchors (stand-in body until the model loads)
 src/meshykid.js       loads the Meshy boys: animation, bone anchors, outfit recolor
 src/haunted2d.js      the 2D haunted house
@@ -57,6 +61,8 @@ assets/               icons, and future models / sprites / music
 Everything on the map is placed using pixel positions from the aerial screenshot, so moving a house is just editing its `x, y` in `src/config.js`.
 
 ## Coming next / how to plug in assets
+
+- **Costume models (GPT → Meshy):** put `<item id>.glb` in `assets/costumes/` and add a line to `data/costume_models.json` (fields: `glb`, `size`, `align`, `offset`, `rot`, `anchor`, `hideHead`, `keepParts`). Outfit prints go under `textures` (`shirt`, `pants`, `sleeves`, `shoes`). Anything missing or broken falls back to the built-in piece. Then open the game with `?fit=1`, slide each piece into place in Hares Hill, tap **Copy all** and paste into `data/costume_fit.json`.
 
 - **Meshy models:** Carter and Jack are the rigged Meshy models in `assets/models/` (`src/meshykid.js`). They play idle, walk and run, costume pieces ride on the head, hand and spine bones, and outfits recolor the shirt, sleeves, pants and shoes. To swap in a new model, export from Meshy with animations as `.glb`, shrink the textures to 1024 px, and replace the file. The simple stand-in kid shows while a model downloads.
 - **Kid sprites in the haunted house:** the GPT sprite sheets live in `tools/sprite_src/`. Run `python3 tools/build_sprites.py` to cut them out, snap them to a real pixel grid (Carter 32 px, Jack 27 px tall), and write `assets/sprites/`. Costumes are drawn on top, and outfits recolor the shirt, pants and shoes. Open `tools/sprite_preview.html` on a local server to see every costume in every direction.

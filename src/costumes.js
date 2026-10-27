@@ -549,7 +549,11 @@ function cape(d, outer, inner, collar) {
   return g;
 }
 
+// pictures loaded from data/costume_models.json land here (see costumefit.js)
+export const EXTRA_TEX = {};
+
 export function outfitTexture(key) {
+  if (key && EXTRA_TEX[key]) return EXTRA_TEX[key];
   return key && TEX[key] ? TEX[key]() : null;
 }
 

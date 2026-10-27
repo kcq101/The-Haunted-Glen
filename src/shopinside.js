@@ -138,6 +138,130 @@ function haloTexture() {
   return new THREE.CanvasTexture(c);
 }
 
+
+// --- cozy extras: wallpaper, wainscot, velvet, glows ------------------------
+function canvasTex(w, h, paint, repeat = false) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  paint(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  return t;
+}
+
+// plum wallpaper with soft stripes, little gold stars and crescent moons
+function wallpaperTexture() {
+  return canvasTex(256, 256, (g, w, h) => {
+    g.fillStyle = '#4a2753'; g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 64) { g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(x + 40, 0, 24, h); g.fillStyle = 'rgba(255,220,160,0.05)'; g.fillRect(x, 0, 6, h); }
+    const star = (x, y, r) => {
+      g.beginPath();
+      for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? r * 0.45 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+      g.closePath(); g.fill();
+    };
+    g.fillStyle = 'rgba(232,184,74,0.55)';
+    star(20, 30, 7); star(148, 158, 7); star(84, 98, 4); star(212, 222, 4); star(212, 60, 3); star(84, 220, 3);
+    g.fillStyle = 'rgba(255,236,190,0.45)';
+    for (const [x, y] of [[148, 36], [20, 166]]) {
+      g.beginPath(); g.arc(x, y, 10, 0, Math.PI * 2); g.fill();
+      g.save(); g.globalCompositeOperation = 'destination-out'; g.beginPath(); g.arc(x + 5, y - 3, 9, 0, Math.PI * 2); g.fill(); g.restore();
+    }
+  }, true);
+}
+
+// raised wooden panels for the lower part of the walls
+function wainscotTexture() {
+  return canvasTex(256, 128, (g, w, h) => {
+    g.fillStyle = '#5a361d'; g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 128) {
+      g.fillStyle = '#3e2412'; g.fillRect(x + 12, 14, 104, h - 28);
+      g.fillStyle = '#6e4426'; g.fillRect(x + 16, 18, 96, h - 36);
+      g.fillStyle = 'rgba(255,220,170,0.12)'; g.fillRect(x + 16, 18, 96, 3);
+      g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(x + 16, h - 21, 96, 3);
+      g.fillStyle = 'rgba(0,0,0,0.08)';
+      for (let i = 0; i < 6; i++) g.fillRect(x + 20 + i * 15, 22, 1, h - 44);
+    }
+  }, true);
+}
+
+// deep purple velvet for the back of each shelf bay, lit from above
+function velvetTexture() {
+  return canvasTex(256, 512, (g, w, h) => {
+    const gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, '#7a3f99'); gr.addColorStop(0.45, '#5a2b78'); gr.addColorStop(1, '#2e1440');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 32) {
+      const f = g.createLinearGradient(x, 0, x + 32, 0);
+      f.addColorStop(0, 'rgba(0,0,0,0.16)'); f.addColorStop(0.5, 'rgba(255,255,255,0.05)'); f.addColorStop(1, 'rgba(0,0,0,0.16)');
+      g.fillStyle = f; g.fillRect(x, 0, 32, h);
+    }
+    g.fillStyle = 'rgba(232,184,74,0.18)';
+    for (let y = 24; y < h; y += 48) for (let x = (y / 48) % 2 ? 16 : 0; x < w; x += 32) {
+      g.save(); g.translate(x, y); g.rotate(Math.PI / 4); g.fillRect(-2.5, -2.5, 5, 5); g.restore();
+    }
+  });
+}
+
+let glowTexCache = null;
+function glowTexture() {
+  if (glowTexCache) return glowTexCache;
+  glowTexCache = canvasTex(64, 64, (g) => {
+    const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,240,200,1)'); gr.addColorStop(0.2, 'rgba(255,200,110,0.6)'); gr.addColorStop(1, 'rgba(255,150,40,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  });
+  glowTexCache.colorSpace = THREE.NoColorSpace;
+  return glowTexCache;
+}
+function glowSprite(size, color = '#ffc070', opacity = 0.8) {
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending }));
+  sp.scale.setScalar(size);
+  sp.userData.baseOpacity = opacity;
+  return sp;
+}
+
+// a proper pumpkin: ribbed, with a curly stem
+const pkGeo = new THREE.SphereGeometry(1, 14, 10);
+const stemMat = litMat({ color: '#5a6b2a' });
+const pkMats = {};
+function pumpkin(r, color = '#ef7d1f') {
+  pkMats[color] = pkMats[color] || [litMat({ color }), litMat({ color: new THREE.Color(color).multiplyScalar(0.82) })];
+  const g = new THREE.Group();
+  for (let i = 0; i < 6; i++) {
+    const rib = new THREE.Mesh(pkGeo, pkMats[color][i % 2]);
+    rib.scale.set(r * 0.62, r * 0.78, r * 0.95);
+    rib.rotation.y = (i / 6) * Math.PI;
+    g.add(rib);
+  }
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.08, r * 0.13, r * 0.45, 6), stemMat);
+  stem.position.y = r * 0.85; stem.rotation.z = 0.25;
+  g.add(stem);
+  g.position.y = r * 0.78;
+  const holder = new THREE.Group();
+  holder.add(g);
+  return holder;
+}
+
+// little candle with a flickering flame
+const waxMat = litMat({ color: '#f4ead2' });
+function candle(hgt = 0.22) {
+  const g = new THREE.Group();
+  const c = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, hgt, 10), waxMat);
+  c.position.y = hgt / 2;
+  g.add(c);
+  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffd27a' }));
+  flame.scale.y = 1.8;
+  flame.position.y = hgt + 0.05;
+  g.add(flame);
+  const glow = glowSprite(0.36, '#ffb050', 0.75);
+  glow.position.y = hgt + 0.06;
+  g.add(glow);
+  g.userData.flame = flame; g.userData.glow = glow;
+  return g;
+}
+
 // --- costume pieces on display ----------------------------------------------
 const formMat = litMat({ color: '#e9dcc6' });
 const pegMat = litMat({ color: WOOD_DARK });
@@ -230,6 +354,18 @@ function fitInto(obj, maxW, maxH, maxD, hang = false) {
   return holder;
 }
 
+// a little wrapped candy, drawn so it looks the same on every phone
+function drawCandy(g, x, y, s) {
+  g.save(); g.translate(x, y); g.scale(s, s); g.rotate(-0.35);
+  g.fillStyle = '#ff5d8a';
+  for (const d of [-1, 1]) { g.beginPath(); g.moveTo(d * 18, 0); g.lineTo(d * 38, -15); g.lineTo(d * 33, 0); g.lineTo(d * 38, 15); g.closePath(); g.fill(); }
+  g.beginPath(); g.ellipse(0, 0, 21, 17, 0, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#ffffff'; g.lineWidth = 5; g.lineCap = 'round';
+  g.beginPath(); g.arc(0, 0, 11, -2.4, 0.4); g.stroke();
+  g.fillStyle = 'rgba(255,255,255,0.7)'; g.beginPath(); g.ellipse(-7, -8, 5, 3, -0.5, 0, Math.PI * 2); g.fill();
+  g.restore();
+}
+
 // price tags are tiny canvases redrawn as things change
 function makeTag() {
   const c = document.createElement('canvas');
@@ -249,7 +385,12 @@ function makeTag() {
     g.beginPath(); g.roundRect(4, 4, 244, 82, 26); g.fill();
     g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.font = 'bold 50px "Nunito", system-ui, sans-serif';
-    g.fillText(state.text, 126, 48);
+    if (state.text.startsWith('🍬')) {
+      const num = state.text.replace('🍬', '').trim();
+      drawCandy(g, 84, 46, 1);
+      g.textAlign = 'left';
+      g.fillText(num, 128, 49);
+    } else g.fillText(state.text, 126, 48);
     tex.needsUpdate = true;
   };
   return m;
@@ -259,7 +400,7 @@ function makeTag() {
 export function buildStoreInterior() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#24142a');
-  scene.fog = new THREE.Fog('#24142a', 22, 42);
+  scene.fog = new THREE.Fog('#24142a', 26, 48);
   scene.add(new THREE.HemisphereLight('#ffe2b8', '#5a3a2a', 1.7));
   const key = new THREE.PointLight('#ffbf70', 45, 22, 1.4);
   key.position.set(0, 5.2, 0.5);
@@ -283,25 +424,38 @@ export function buildStoreInterior() {
 
   // floor, walls, beams
   const ft = plankTexture('#9a6438', 16);
-  ft.repeat.set(4, 3);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D + 6), litMat({ map: ft }));
+  ft.repeat.set(4, 5.5);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D + 16), litMat({ map: ft }));
   floor.rotation.x = -Math.PI / 2;
-  floor.position.z = 3;
+  floor.position.z = 8;
   scene.add(floor);
-  const wt = plankTexture('#7a4f30', 12, 256, 256, true);
-  wt.repeat.set(6, 1);
-  const wallMat = litMat({ map: wt });
-  const back = new THREE.Mesh(new THREE.PlaneGeometry(W, H), wallMat);
-  back.position.set(0, H / 2, BACK);
-  scene.add(back);
-  for (const sd of [-1, 1]) {
-    const side = new THREE.Mesh(new THREE.PlaneGeometry(D + 6, H), wallMat);
-    side.position.set(sd * W / 2, H / 2, 3);
-    side.rotation.y = -sd * Math.PI / 2;
-    scene.add(side);
-  }
+  const WAIN = 1.35; // height of the wooden panelling
+  const paper = wallpaperTexture();
+  const wain = wainscotTexture();
+  const wallPiece = (len, x, z, ry) => {
+    const pt = paper.clone(); pt.needsUpdate = true; pt.repeat.set(len / 1.3, (H - WAIN) / 1.3);
+    const up = new THREE.Mesh(new THREE.PlaneGeometry(len, H - WAIN), litMat({ map: pt }));
+    up.position.set(x, WAIN + (H - WAIN) / 2, z); up.rotation.y = ry;
+    scene.add(up);
+    const wt2 = wain.clone(); wt2.needsUpdate = true; wt2.repeat.set(len / 1.6, 1);
+    const lo = new THREE.Mesh(new THREE.PlaneGeometry(len, WAIN), litMat({ map: wt2 }));
+    lo.position.set(x, WAIN / 2, z); lo.rotation.y = ry;
+    scene.add(lo);
+  };
+  wallPiece(W, 0, BACK, 0);
+  for (const sd of [-1, 1]) wallPiece(D + 16, sd * W / 2, 8, -sd * Math.PI / 2);
+  // chair rail along the top of the panelling
+  box(lightMat, 0, WAIN, BACK + 0.04, W, 0.08, 0.08);
+  for (const sd of [-1, 1]) box(lightMat, sd * (W / 2 - 0.04), WAIN, 8, 0.08, 0.08, D + 16);
+  // plank ceiling
+  const ct = plankTexture('#4a2e1a', 10);
+  ct.repeat.set(5, 7);
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(W, D + 16), litMat({ map: ct }));
+  ceil.rotation.x = Math.PI / 2;
+  ceil.position.set(0, H, 8);
+  scene.add(ceil);
   box(darkMat, 0, 0.12, BACK + 0.04, W, 0.24, 0.08); // skirting
-  for (const sd of [-1, 1]) box(darkMat, sd * (W / 2 - 0.04), 0.12, 3, 0.08, 0.24, D + 6);
+  for (const sd of [-1, 1]) box(darkMat, sd * (W / 2 - 0.04), 0.12, 8, 0.08, 0.24, D + 16);
   for (let x = -7.5; x <= 7.5; x += 3.75) box(darkMat, x, H - 0.2, -2.5, 0.32, 0.32, D - 5);
   box(darkMat, 0, H - 0.4, BACK + 0.2, W, 0.3, 0.3);
 
@@ -312,12 +466,39 @@ export function buildStoreInterior() {
   const halos = [];
   const haloTex = haloTexture();
   const shelfMat = litMat({ map: plankTexture(WOOD_LIGHT, 3, 128, 64) });
+  const velvetMat = litMat({ map: velvetTexture() });
+  const fairy = []; // { bulb, glow, phase }
+  const candles = [];
+  const bulbCols = ['#ffd27a', '#ff9a3c', '#c08cff', '#ffd27a', '#7cffb0'];
+  const poolMat = new THREE.MeshBasicMaterial({ map: glowTexture(), color: '#ffcf8a', transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending });
   BAYS.forEach((bay, bi) => {
     const g = new THREE.Group();
     g.position.set(BAY_X[bi], 0, BAY_Z);
     scene.add(g);
     // frame
-    box(litMat({ color: '#3f2716' }), 0, 2.0, -0.38, BAY_W - 0.1, 3.9, 0.06, 0, g);
+    box(velvetMat, 0, 2.0, -0.38, BAY_W - 0.1, 3.9, 0.06, 0, g);
+    // warm light spilling down the velvet from the top of the bay
+    const pool = new THREE.Mesh(new THREE.PlaneGeometry(BAY_W * 1.1, 2.6), poolMat);
+    pool.position.set(0, 3.3, -0.33);
+    g.add(pool);
+    // a string of fairy lights draped along the top
+    const n = 9, pts = [];
+    for (let k = 0; k < n; k++) {
+      const t = k / (n - 1), x = -BAY_W / 2 + 0.12 + t * (BAY_W - 0.24);
+      const y = 3.98 - Math.sin(t * Math.PI) * 0.16 - Math.sin(t * Math.PI * 2) ** 2 * 0.05;
+      pts.push(new THREE.Vector3(x, y, 0.44));
+      const col = bulbCols[(k + bi) % bulbCols.length];
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), new THREE.MeshBasicMaterial({ color: col }));
+      bulb.scale.y = 1.3;
+      bulb.position.set(x, y - 0.05, 0.45);
+      g.add(bulb);
+      const gl = glowSprite(0.32, col, 0.7);
+      gl.position.copy(bulb.position);
+      g.add(gl);
+      fairy.push({ glow: gl, phase: k * 1.7 + bi * 0.9 });
+    }
+    const wire = new THREE.Line(new THREE.BufferGeometry().setFromPoints(new THREE.CatmullRomCurve3(pts).getPoints(40)), new THREE.LineBasicMaterial({ color: '#2a1a10' }));
+    g.add(wire);
     for (const sd of [-1, 1]) box(woodMat, sd * (BAY_W / 2 - 0.08), 2.05, 0, 0.16, 4.1, 0.8, 0, g);
     box(woodMat, 0, 0.25, 0.02, BAY_W - 0.2, 0.5, 0.76, 0, g); // base cabinet
     for (const sd of [-1, 1]) {
@@ -330,11 +511,16 @@ export function buildStoreInterior() {
     sign.position.set(0, 4.55, 0.1);
     g.add(sign);
     box(darkMat, 0, 4.55, 0.06, 2.42, 0.66, 0.06, 0, g);
-    // a pumpkin perched on top of the bay
-    const pk = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 10), litMat({ color: '#ef7d1f' }));
-    pk.scale.y = 0.8;
-    pk.position.set(bi % 2 ? -1.1 : 1.1, 4.36, 0.05);
+    // a pumpkin and a couple of candles perched on top of the bay
+    const pk = pumpkin(0.21, bi === 2 ? '#e8e2cf' : '#ef7d1f');
+    pk.position.set(bi % 2 ? -1.12 : 1.12, 4.2, 0.12);
     g.add(pk);
+    for (const [dx, hgt] of [[0.3, 0.26], [0.42, 0.17]]) {
+      const cd = candle(hgt);
+      cd.position.set((bi % 2 ? -1.12 : 1.12) + (bi % 2 ? dx : -dx), 4.2, 0.2);
+      g.add(cd);
+      candles.push(cd);
+    }
 
     const bh = new THREE.Mesh(new THREE.BoxGeometry(BAY_W, 4.9, 1.0), new THREE.MeshBasicMaterial({ visible: false }));
     bh.position.set(0, 2.45, 0.1);
@@ -390,15 +576,12 @@ export function buildStoreInterior() {
     // fill any spare spot with a little decoration
     for (let i = items.length; i < spots.length; i++) {
       const s = spots[i];
-      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.24, 10), litMat({ color: '#f6efd8' }));
-      c.position.set(s.x - 0.12, s.y + 0.12, 0);
-      g.add(c);
-      const fl = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffcf6a' }));
-      fl.position.set(s.x - 0.12, s.y + 0.29, 0);
-      g.add(fl);
-      const pk2 = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 8), litMat({ color: '#ef7d1f' }));
-      pk2.scale.y = 0.75;
-      pk2.position.set(s.x + 0.16, s.y + 0.13, 0);
+      const cd = candle(0.24);
+      cd.position.set(s.x - 0.16, s.y, 0.05);
+      g.add(cd);
+      candles.push(cd);
+      const pk2 = pumpkin(0.16);
+      pk2.position.set(s.x + 0.14, s.y, 0);
       g.add(pk2);
     }
   });
@@ -482,8 +665,8 @@ export function buildStoreInterior() {
   shopSign.rotation.y = 0.75;
   scene.add(shopSign);
   box(darkMat, -7.58, 4.05, -2.73, 3.55, 1.18, 0.05, 0.75);
-  const signPk = new THREE.Mesh(new THREE.SphereGeometry(0.26, 14, 10), litMat({ color: '#ef7d1f' }));
-  signPk.scale.y = 0.8; signPk.position.set(-7.0, 4.7, -2.15);
+  const signPk = pumpkin(0.24);
+  signPk.position.set(-7.0, 4.58, -2.15);
   scene.add(signPk);
 
   // --- decorations -------------------------------------------------------------
@@ -512,16 +695,37 @@ export function buildStoreInterior() {
     box(darkMat, Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5, 1.0, 0.04, 0.04, -a, chand);
     const l = box(new THREE.MeshBasicMaterial({ color: '#ffcf6a' }), Math.cos(a), 0.18, Math.sin(a), 0.16, 0.26, 0.16, 0, chand);
     lamps.push(l);
+    const gl = glowSprite(0.9, '#ffb860', 0.55);
+    gl.position.set(Math.cos(a), 0.18, Math.sin(a));
+    chand.add(gl);
   }
   // hanging lanterns along the front
-  for (const x of [-4.2, 4.2]) {
-    box(new THREE.MeshBasicMaterial({ color: '#222' }), x, H - 0.75, 0.6, 0.02, 1.1, 0.02);
-    const l = box(new THREE.MeshBasicMaterial({ color: '#ffcf6a' }), x, H - 1.45, 0.6, 0.24, 0.32, 0.24);
+  for (const x of [-7.9, 7.9]) {
+    const lz = -3.4;
+    box(new THREE.MeshBasicMaterial({ color: '#222' }), x, H - 0.75, lz, 0.02, 1.1, 0.02);
+    const l = box(new THREE.MeshBasicMaterial({ color: '#ffcf6a' }), x, H - 1.45, lz, 0.24, 0.32, 0.24);
     lamps.push(l);
     const c2 = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.15, 4), darkMat);
-    c2.position.set(x, H - 1.22, 0.6); c2.rotation.y = Math.PI / 4;
+    c2.position.set(x, H - 1.22, lz); c2.rotation.y = Math.PI / 4;
     scene.add(c2);
+    const gl = glowSprite(1.1, '#ffb860', 0.6);
+    gl.position.set(x, H - 1.45, lz);
+    scene.add(gl);
   }
+  // soft pool of light on the floor under the chandelier
+  const floorPool = new THREE.Mesh(new THREE.PlaneGeometry(8, 6), new THREE.MeshBasicMaterial({ map: glowTexture(), color: '#ff9a40', transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending }));
+  floorPool.rotation.x = -Math.PI / 2;
+  floorPool.position.set(0, 0.03, -1.3);
+  scene.add(floorPool);
+  // dust motes drifting in the lamplight
+  const MOTES = q(70, 30);
+  const moteGeo = new THREE.BufferGeometry();
+  const mp = new Float32Array(MOTES * 3), mSeed = [];
+  for (let i = 0; i < MOTES; i++) { mSeed.push([Math.random() * 14 - 7, Math.random() * 4.5 + 0.4, Math.random() * 7 - 5.5, Math.random() * 6.28]); }
+  moteGeo.setAttribute('position', new THREE.BufferAttribute(mp, 3));
+  const motes = new THREE.Points(moteGeo, new THREE.PointsMaterial({ map: glowTexture(), color: '#ffd9a0', size: 0.07, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending }));
+  motes.frustumCulled = false;
+  scene.add(motes);
   // friendly little ghosts hanging from the beams
   const ghosts = [];
   const ghostMat = litMat({ color: '#f6f3fb' });
@@ -579,9 +783,12 @@ export function buildStoreInterior() {
     hoop.rotation.x = Math.PI / 2; hoop.position.set(7.2, y, 0.9);
     scene.add(hoop);
   }
-  const bpk = new THREE.Mesh(new THREE.SphereGeometry(0.32, 14, 10), litMat({ color: '#ef7d1f' }));
-  bpk.scale.y = 0.8; bpk.position.set(7.2, 1.18, 0.9);
+  const bpk = pumpkin(0.3);
+  bpk.position.set(7.2, 0.96, 0.9);
   scene.add(bpk);
+  const bpk2 = pumpkin(0.18, '#e8e2cf');
+  bpk2.position.set(6.95, 0.96, 1.15);
+  scene.add(bpk2);
   // potted plants
   const leaf = litMat({ color: '#4f8a3a' });
   const pot = litMat({ color: '#b5653a' });
@@ -612,9 +819,8 @@ export function buildStoreInterior() {
   scene.add(web);
 
   // where the boys stand, and what the camera frames
-  // upright phone: stand right in front; sideways: stand beside the bay
-  const bayFront = (i, portrait) => portrait ? new THREE.Vector3(BAY_X[i], 0, BAY_Z + 2.6)
-    : new THREE.Vector3(BAY_X[i] + (i < 3 ? 1.95 : -1.95), 0, BAY_Z + 1.0);
+  // the shopper stands out in front of the bay, facing the chest-high camera
+  const bayFront = (i) => new THREE.Vector3(BAY_X[i], 0, BAY_Z + 4.0);
   const bayPoints = (i) => [
     new THREE.Vector3(BAY_X[i] - BAY_W / 2, 0.3, BAY_Z + 0.4), new THREE.Vector3(BAY_X[i] + BAY_W / 2, 0.3, BAY_Z + 0.4),
     new THREE.Vector3(BAY_X[i] - BAY_W / 2, 5.0, BAY_Z), new THREE.Vector3(BAY_X[i] + BAY_W / 2, 5.0, BAY_Z),
@@ -638,10 +844,26 @@ export function buildStoreInterior() {
     wallPoints,
     stand: new THREE.Vector3(-0.7, 0, 1.2),
     standOther: new THREE.Vector3(1.0, 0, 0.8),
+    // upright phone: the boys stand closer to the camera in the whole-shop view
+    standNear: new THREE.Vector3(-0.8, 0, 9.4),
+    standOtherNear: new THREE.Vector3(0.9, 0, 8.9),
     update(time, dt) {
       hazel.userData.update(time, dt);
       haloT += dt;
       lamps.forEach((l, i) => l.material.color.setHSL(0.11, 1, 0.68 + Math.sin(time * 6 + i * 1.7) * 0.04));
+      for (const f of fairy) f.glow.material.opacity = f.glow.userData.baseOpacity * (0.65 + 0.35 * Math.sin(time * 1.6 + f.phase) ** 2);
+      candles.forEach((cd, i) => {
+        const fl = 0.85 + Math.sin(time * 13 + i * 3.1) * 0.08 + Math.sin(time * 7.3 + i) * 0.07;
+        cd.userData.flame.scale.set(1, 1.8 * fl, 1);
+        cd.userData.glow.material.opacity = cd.userData.glow.userData.baseOpacity * fl;
+      });
+      for (let i = 0; i < MOTES; i++) {
+        const [x, y, z, ph] = mSeed[i];
+        mp[i * 3] = x + Math.sin(time * 0.21 + ph) * 0.6;
+        mp[i * 3 + 1] = 0.4 + ((y + time * 0.06 + Math.sin(time * 0.4 + ph) * 0.15) % 4.5);
+        mp[i * 3 + 2] = z + Math.cos(time * 0.17 + ph) * 0.5;
+      }
+      moteGeo.attributes.position.needsUpdate = true;
       ghosts.forEach((gh, i) => { gh.position.y = H - 1.3 + Math.sin(time * 1.3 + i * 2) * 0.08; gh.rotation.y = Math.sin(time * 0.7 + i) * 0.4; });
       for (const c of cells) {
         const on = c.state === 'wearing' || c.state === 'trying';

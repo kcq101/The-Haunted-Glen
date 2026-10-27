@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { litMat, q } from './quality.js';
 import { ITEM, outfitTexture } from './costumes.js';
 import { MeshyBody } from './meshykid.js';
+import { fitFor, fitWrap, kidKey } from './costumefit.js';
 
 // A cozy, chunky kid built from rounded shapes. Costume pieces snap onto
 // anchors (head, hand, shoulder, back, waist, neck). This is the stand-in;
@@ -203,8 +204,9 @@ export class Kid {
       for (const part of item.build(this.d)) {
         const name = slot === 'face' && part.anchor === 'head' ? 'face' : part.anchor;
         const anchor = this.anchors[name] || this.anchors.head;
-        anchor.add(part.obj);
-        this.costumeObjs.push(part.obj);
+        const fitted = fitWrap(part.obj, fitFor(kidKey(this), item.id, slot));
+        anchor.add(fitted);
+        this.costumeObjs.push(fitted);
         part.obj.traverse((o) => { if (o.userData.blink || o.userData.bob || o.userData.flap || o.userData.spin || o.userData.cape) this.animated.push(o); });
         if (part.hideHead && this.model) this.model.hideHead = true;
         if (part.hideBody && this.model) this.model.root.visible = false;

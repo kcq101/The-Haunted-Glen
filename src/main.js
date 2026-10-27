@@ -14,6 +14,8 @@ import { buildStoreInterior } from './shopinside.js';
 import { Kid } from './character.js';
 import { Controls } from './controls.js';
 import { ITEM } from './costumes.js';
+import { loadCostumeData } from './costumefit.js';
+import { initFitTuner } from './fittuner.js';
 import { HauntedHouse, CORN_TOTAL, CORN_REWARDS } from './haunted2d.js';
 import { initAudio, sfx, setMuted, isMuted, updateAmbient } from './audio.js';
 import { loadSave, writeSave } from './save.js';
@@ -419,6 +421,12 @@ let preview = null; // { slot, id } — something being tried on that isn't boug
 const shopCam = { fov: 55, tFov: 55, pos: new THREE.Vector3(), look: new THREE.Vector3(), tPos: new THREE.Vector3(), tLook: new THREE.Vector3(), key: '', snap: true };
 const isPortrait = () => window.innerWidth / window.innerHeight < 1.05;
 
+function hazelSay(text) {
+  $('hazel-text').textContent = text;
+  const el = $('hazel');
+  el.classList.remove('say'); void el.offsetWidth; el.classList.add('say');
+}
+
 function enterShop() {
   sfx.door();
   fadeTo(() => {
@@ -432,7 +440,7 @@ function enterShop() {
     setShopTargets(true);
     $('hud').classList.add('hidden');
     $('shop').classList.remove('hidden');
-    $('hazel-text').textContent = pick(HAZEL_LINES.welcome);
+    hazelSay(pick(HAZEL_LINES.welcome));
     I.hazel.userData.wave();
     preview = null;
     shopCam.snap = true;
@@ -466,8 +474,9 @@ function leaveShop() {
 function setShopTargets(snap = false) {
   const I = W.interior;
   const cur = kids[current].root, oth = kids[other()].root;
-  cur.userData.shopTarget = shopPage ? I.bayFront(shopPage - 1, isPortrait()) : I.stand.clone();
-  oth.userData.shopTarget = I.standOther.clone();
+  const near = isPortrait();
+  cur.userData.shopTarget = shopPage ? I.bayFront(shopPage - 1, near) : (near ? I.standNear : I.stand).clone();
+  oth.userData.shopTarget = (near ? I.standOtherNear : I.standOther).clone();
   if (snap) for (const r of [cur, oth]) { r.position.copy(r.userData.shopTarget); r.rotation.y = 0; }
 }
 
@@ -531,19 +540,19 @@ function tryOn(it) {
     kid.setCostume({ ...kid.costume, [slot]: null });
     save.outfits[current][slot] = null;
     writeSave(save);
-    $('hazel-text').textContent = pick(HAZEL_LINES.off);
+    hazelSay(pick(HAZEL_LINES.off));
   } else {
     kid.setCostume({ ...kid.costume, [slot]: it.id });
     if (kid.jumpY === 0) kid.jumpV = 3;
     if (owned) {
       save.outfits[current][slot] = it.id;
       writeSave(save);
-      $('hazel-text').textContent = pick(HAZEL_LINES.buy);
+      hazelSay(pick(HAZEL_LINES.buy));
     } else {
       preview = { slot, id: it.id };
-      if (it.reward) $('hazel-text').textContent = pick(HAZEL_LINES.reward);
-      else if (save.candy < it.cost) $('hazel-text').textContent = `The ${it.name} costs ${it.cost} candy. ${pick(HAZEL_LINES.poor)}`;
-      else $('hazel-text').textContent = `Ooh, the ${it.name}! That's ${it.cost} candy.`;
+      if (it.reward) hazelSay(pick(HAZEL_LINES.reward));
+      else if (save.candy < it.cost) hazelSay(`The ${it.name} costs ${it.cost} candy. ${pick(HAZEL_LINES.poor)}`);
+      else hazelSay(`Ooh, the ${it.name}! That's ${it.cost} candy.`);
     }
   }
   renderShop();
@@ -571,7 +580,7 @@ $('shop-buy').addEventListener('click', () => {
   sfx.chime();
   W.interior.hazel.userData.cheer();
   if (kids[current].jumpY === 0) kids[current].jumpV = 4.5;
-  $('hazel-text').textContent = pick(HAZEL_LINES.buy);
+  hazelSay(pick(HAZEL_LINES.buy));
   updateCounters();
   renderShop();
 });
@@ -624,7 +633,7 @@ function swapKid() {
     save.current = current;
     writeSave(save);
     updateSwapButton();
-    $('hazel-text').textContent = `Hello there, ${CHARACTERS[current].name}! What would you like to try?`;
+    hazelSay(`Hello there, ${CHARACTERS[current].name}! What would you like to try?`);
     renderShop();
     return;
   }
@@ -897,7 +906,7 @@ function fitShopCamera() {
   const w = window.innerWidth, h = window.innerHeight;
   const portrait = isPortrait();
   const topH = $('shop-top').getBoundingClientRect().bottom;
-  const botH = portrait ? h - $('shop-bottom').getBoundingClientRect().top : 8;
+  const botH = h - $('shop-bottom').getBoundingClientRect().top + 6;
   const leftW = portrait ? 0 : document.querySelector('.shop-pager').getBoundingClientRect().right + 4;
   const rightW = portrait ? 0 : w - document.querySelector('.shop-bar').getBoundingClientRect().left + 4;
   const key = [w, h, portrait, shopPage, current, Math.round(topH), Math.round(botH), Math.round(leftW), Math.round(rightW)].join();
@@ -905,7 +914,7 @@ function fitShopCamera() {
   shopCam.key = key;
   camera.aspect = w / h;
   // an upright phone can't fit the whole shop at the normal lens, so widen it
-  shopCam.tFov = portrait && !shopPage ? 80 : 55;
+  shopCam.tFov = portrait && !shopPage ? 72 : 55;
   const fovNow = camera.fov;
   camera.fov = shopCam.tFov;
   camera.setViewOffset(w, h, (rightW - leftW) * 0.5, (botH - topH) * 0.5, w, h);
@@ -913,12 +922,16 @@ function fitShopCamera() {
   const pts = [];
   const kidPts = (k) => {
     const t = k.root.userData.shopTarget, kh = CHARACTERS[k === kids[current] ? current : other()].height;
-    pts.push(t.clone().add(new THREE.Vector3(-0.4, 0, 0.3)), t.clone().add(new THREE.Vector3(0.4, 0, 0.3)), t.clone().add(new THREE.Vector3(0, kh + 0.15, 0)));
+    const footY = shopPage ? kh * 0.12 : 0; // try-on view can crop the shoes a touch
+    pts.push(t.clone().add(new THREE.Vector3(-0.4, footY, 0.3)), t.clone().add(new THREE.Vector3(0.4, footY, 0.3)), t.clone().add(new THREE.Vector3(0, kh + 0.15, 0)));
   };
-  if (shopPage) { pts.push(...I.bayPoints(shopPage - 1)); kidPts(kids[current]); } else { pts.push(...I.wallPoints); kidPts(kids[current]); kidPts(kids[other()]); }
+  if (shopPage) { pts.push(...I.bayPoints(shopPage - 1)); kidPts(kids[current]); } else {
+    // an upright phone frames just the four bays (Hazel's desk peeks in at the edge)
+    pts.push(...(portrait ? [...I.bayPoints(0), ...I.bayPoints(3)] : I.wallPoints));
+    kidPts(kids[current]); kidPts(kids[other()]);
+  }
   const box = new THREE.Box3().setFromPoints(pts);
   const target = box.getCenter(new THREE.Vector3());
-  const dir = new THREE.Vector3(0, !shopPage ? 0.36 : portrait ? 0.3 : 0.16, 1).normalize();
   const u = Math.max(0.2, (h - topH - botH) / h) * 0.96, ux = Math.max(0.2, (w - leftW - rightW) / w) * 0.96;
   const place = (d) => {
     camera.position.copy(target).addScaledVector(dir, d);
@@ -931,26 +944,44 @@ function fitShopCamera() {
     }
     return { x0, x1, y0, y1 };
   };
-  let d = 10;
-  for (let iter = 0; iter < 4; iter++) {
-    let lo = 1, hi = 60;
-    for (let k = 0; k < 24; k++) {
-      const m = (lo + hi) / 2, b = place(m);
+  {
+    // Try-on view: the camera sits about chest high in front of the shopper
+    // and tilts up, so the costume fills the bottom of the screen and the
+    // whole shelf bay rises up behind him. The whole-shop view uses the same
+    // idea from just under the ceiling, so it never peeks over the walls.
+    const kt = kids[current].root.userData.shopTarget, kh = CHARACTERS[current].height;
+    const cx = (box.min.x + box.max.x) / 2, cy = shopPage ? kh * 0.74 : 5.5;
+    const aim = (dz, pitch) => {
+      camera.position.set(cx, cy, kt.z + dz);
+      camera.lookAt(cx, cy + Math.tan(pitch), kt.z + dz - 1);
+      camera.updateMatrixWorld(true);
+      let x0 = 9, x1 = -9, y0 = 9, y1 = -9;
+      for (const p of pts) {
+        fitV.copy(p).project(camera);
+        if (fitV.z > 1 || fitV.z < -1) return { x0: -9, x1: 9, y0: -9, y1: 9 }; // behind the lens
+        x0 = Math.min(x0, fitV.x); x1 = Math.max(x1, fitV.x); y0 = Math.min(y0, fitV.y); y1 = Math.max(y1, fitV.y);
+      }
+      return { x0, x1, y0, y1 };
+    };
+    // for a distance, tilt until the picture is centred top-to-bottom
+    const tilt = (dz) => {
+      let lo = -1.0, hi = 1.2;
+      // try-on: centred; whole shop: shelves pinned near the top so the lit floor fills the rest
+      for (let k = 0; k < 22; k++) { const m = (lo + hi) / 2, b = aim(dz, m); if ((shopPage ? (b.y0 + b.y1) / 2 : b.y1 - u * 0.97) > 0) lo = m; else hi = m; }
+      return (lo + hi) / 2;
+    };
+    let lo = 0.6, hi = 20;
+    for (let k = 0; k < 22; k++) {
+      const m = (lo + hi) / 2, b = aim(m, tilt(m));
       if (b.x0 < -ux || b.x1 > ux || b.y0 < -u || b.y1 > u) lo = m; else hi = m;
     }
-    d = hi;
-    const b = place(d);
-    // recentre: nudge the target so the points sit in the middle of the gap
-    const hh = d * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), hw = hh * camera.aspect;
-    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
-    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
-    target.addScaledVector(right, ((b.x0 + b.x1) / 2) * hw).addScaledVector(up, ((b.y0 + b.y1) / 2) * hh);
+    const pitch = tilt(hi);
+    aim(hi, pitch);
+    shopCam.tPos.copy(camera.position);
+    shopCam.tLook.set(cx, cy + Math.tan(pitch) * 4, kt.z + hi - 4);
+    camera.fov = fovNow;
+    camera.updateProjectionMatrix();
   }
-  place(d);
-  shopCam.tPos.copy(camera.position);
-  shopCam.tLook.copy(target);
-  camera.fov = fovNow;
-  camera.updateProjectionMatrix();
 }
 
 function angleTo(a, b, t) {
@@ -970,7 +1001,7 @@ function updateShop(dt) {
     const dx = t.x - r.position.x, dz = t.z - r.position.z, dist = Math.hypot(dx, dz);
     const moving = dist > 0.04;
     if (moving) {
-      const step = Math.min(dist, 2.4 * dt);
+      const step = Math.min(dist, Math.max(2.4, dist * 1.8) * dt);
       r.position.x += (dx / dist) * step; r.position.z += (dz / dist) * step;
       r.rotation.y = angleTo(r.rotation.y, Math.atan2(dx, dz), Math.min(1, dt * 10));
     } else {
@@ -1052,6 +1083,8 @@ requestAnimationFrame(() => setTimeout(async () => {
     const r = await fetch('data/elevation.json');
     if (r.ok) setElevation(await r.json());
   } catch (e) { /* fall back to the hand-shaped hills */ }
+  await loadCostumeData(); // fit tweaks + any GPT/Meshy costume models
+  for (const k of Object.values(kids)) k.setCostume(k.costume);
   const t0 = performance.now();
   buildWorld();
   placeAtHome();
@@ -1065,6 +1098,8 @@ requestAnimationFrame(() => setTimeout(async () => {
   updateCounters();
   requestAnimationFrame(frame);
 }, 30));
+
+initFitTuner({ getKid: () => kids[current], isShop: () => mode === 'shop' });
 
 // handy for testing from the console
 window.__game = { shopCam, get preview() { return preview; }, setShopPage: (i) => setShopPage(i), shopSnap: () => { setShopTargets(true); shopCam.snap = true; }, tryOnId: (id) => tryOn(ITEM[id]), save, sky, player, cam, autoCam, W, kids, get mode() { return mode; }, enterShop, enterHaunted, renderer, scene, camera, get action() { return currentAction; }, doAction, haunted };
