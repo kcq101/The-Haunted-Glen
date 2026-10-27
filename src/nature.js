@@ -168,6 +168,9 @@ export function createTrees(specs, heightAt) {
   const blobMat = litMat({ color: '#ffffff', vertexColors: HIGH });
   const coneGeo = HIGH ? pineTier() : new THREE.ConeGeometry(1, 1.6, 7);
   const coneMat = litMat({ color: '#ffffff', vertexColors: HIGH });
+  // limbs that carry the trunk up into the side clumps of the canopy
+  const limbGeo = new THREE.CylinderGeometry(0.55, 1, 1, HIGH ? 7 : 5);
+  limbGeo.translate(0, 0.5, 0);
 
   const chunks = new Map();
   for (const t of trees) {
@@ -184,6 +187,8 @@ export function createTrees(specs, heightAt) {
     const nDec = list.filter((t) => !t.conifer).length;
     const nCon = list.length - nDec;
     const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, list.length);
+    const limbs = nDec ? new THREE.InstancedMesh(limbGeo, trunkMat, nDec * (blobsPer - 1)) : null;
+    let li = 0;
     const nYard = list.filter((t) => !t.conifer && !t.woods).length;
     const blobs = nDec - nYard ? new THREE.InstancedMesh(blobGeo, blobMat, (nDec - nYard) * blobsPer) : null;
     const yard = nYard ? new THREE.InstancedMesh(yardGeo, blobMat, nYard * blobsPer) : null;
@@ -194,8 +199,13 @@ export function createTrees(specs, heightAt) {
       const y = heightAt(t.x, t.z);
       t.y = y;
       const trunkH = (t.conifer ? 2.2 : t.woods ? 4.2 : 2.6) * t.s;
-      q.setFromAxisAngle(up, rng() * Math.PI * 2);
-      m.compose(v.set(t.x, y - 0.2, t.z), q, sc.set(t.s * (t.woods ? 1.1 : 0.8), trunkH + 0.2, t.s * (t.woods ? 1.1 : 0.8)));
+      const yaw = rng() * Math.PI * 2;
+      q.setFromAxisAngle(up, yaw);
+      const thick = t.s * (t.woods ? 1.1 : 0.8);
+      // deciduous trunks run on up into the middle of the canopy so the
+      // leaves sit on the tree instead of hovering over it
+      const trunkLen = t.conifer ? trunkH : trunkH + 1.6 * t.s;
+      m.compose(v.set(t.x, y - 0.2, t.z), q, sc.set(thick, trunkLen + 0.2, thick));
       trunks.setMatrixAt(ti++, m);
       if (t.conifer) {
         for (let k = 0; k < 3; k++) {
@@ -206,21 +216,30 @@ export function createTrees(specs, heightAt) {
         }
       } else {
         const base = new THREE.Color(t.color);
+        const fork = new THREE.Vector3(t.x, y + trunkH * 0.72, t.z);
         for (let k = 0; k < blobsPer; k++) {
-          const a = rng() * Math.PI * 2;
-          const off = k === 0 ? 0 : 1.1 * t.s;
+          // side clumps spread around the trunk, each on its own limb
+          const a = yaw + k * 2.2 + (rng() - 0.5) * 0.5;
+          const off = k === 0 ? 0 : 1.2 * t.s;
           const r = (k === 0 ? 2.5 : 1.9 + rng() * 0.4) * t.s * (t.woods ? 1.15 : 1);
-          m.compose(
-            v.set(t.x + Math.cos(a) * off, y + trunkH + r * 0.55 + (k === 0 ? 0.4 : rng() * 1.2) * t.s, t.z + Math.sin(a) * off),
-            q,
-            sc.set(r, r * 0.85, r),
-          );
+          // canopy bottom (about 0.63r below center) tucks just below the trunk top
+          const cy = y + trunkH + r * (k === 0 ? 0.42 : 0.5) + (k === 0 ? 0 : rng() * 0.5 * t.s);
+          const cx = t.x + Math.cos(a) * off, cz = t.z + Math.sin(a) * off;
+          m.compose(v.set(cx, cy, cz), q, sc.set(r, r * 0.85, r));
           col.copy(base).offsetHSL((rng() - 0.5) * 0.03, 0, (rng() - 0.5) * 0.1);
           if (t.woods) { blobs.setMatrixAt(bi, m); blobs.setColorAt(bi++, col); } else { yard.setMatrixAt(yi, m); yard.setColorAt(yi++, col); }
+          if (k > 0) {
+            const tip = new THREE.Vector3(cx, cy - r * 0.15, cz);
+            const dir = tip.clone().sub(fork);
+            const len = dir.length();
+            const lq = new THREE.Quaternion().setFromUnitVectors(up, dir.normalize());
+            const lr = 0.17 * thick;
+            limbs.setMatrixAt(li++, m.compose(fork, lq, sc.set(lr, len, lr)));
+          }
         }
       }
     }
-    for (const im of [trunks, blobs, yard, cones]) {
+    for (const im of [trunks, limbs, blobs, yard, cones]) {
       if (!im) continue;
       im.castShadow = true;
       im.receiveShadow = true;

@@ -29,8 +29,11 @@ export class Builder {
     const col = new THREE.Color(color);
     const n = g.attributes.position.count;
     const c = new Float32Array(n * 3);
+    // shapes with their own vertex shading get tinted by the color
+    const own = g.attributes.color;
     for (let i = 0; i < n; i++) {
-      c[i * 3] = col.r; c[i * 3 + 1] = col.g; c[i * 3 + 2] = col.b;
+      const k = own ? [own.getX(i), own.getY(i), own.getZ(i)] : [1, 1, 1];
+      c[i * 3] = col.r * k[0]; c[i * 3 + 1] = col.g * k[1]; c[i * 3 + 2] = col.b * k[2];
     }
     g.setAttribute('color', new THREE.BufferAttribute(c, 3));
     // group pieces into map chunks so the renderer can skip what's off screen

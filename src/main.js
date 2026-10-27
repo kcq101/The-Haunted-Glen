@@ -101,7 +101,7 @@ function buildWorld() {
     }
   }
   decorateNeighborhood(B, glows, specs, terrain.heightAt);
-  addStreetLamps(B, glows, terrain.heightAt);
+  addStreetLamps(B, glows, terrain.heightAt, [...marks.driveways, ...marks.walkways]);
   addBoundaryFence(B, terrain.heightAt);
   const trail = addTrail(B, glows, scene, terrain.heightAt);
   W.bridge = trail.bridge;

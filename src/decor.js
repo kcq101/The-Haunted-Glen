@@ -5,30 +5,17 @@ import { makeRng, polylineDistance, resample } from './util.js';
 import { toWorld } from './houses.js';
 import { roadLines, trailLine, creekLine, culDeSac } from './terrain.js';
 import { px, BOUNDS } from './config.js';
+import { addPumpkin, addGhost, addCat, addSkeleton as buildSkeleton } from './props.js';
+
+export { addPumpkin };
 
 // ---------------------------------------------------------------------------
 // Fall + Halloween decorations, street lamps, trail lanterns, the footbridge
 // and the extra-spooky touches on the haunted house.
 // ---------------------------------------------------------------------------
 
-export function addPumpkin(B, glows, x, y, z, r, ry = 0, carved = false, color = '#ef7d1f') {
-  for (let i = 0; i < 4; i++) {
-    const a = (i / 4) * Math.PI * 2 + ry + 0.4;
-    B.add(GEO.sphereLo, color, { x: x + Math.sin(a) * r * 0.3, y: y + r * 0.62, z: z + Math.cos(a) * r * 0.3, ry: a, sx: r * 1.1, sy: r * 1.2, sz: r * 1.35 });
-  }
-  B.add(GEO.cylLo, '#56702c', { x, y: y + r * 1.3, z, rz: 0.25, sx: r * 0.18, sy: r * 0.5, sz: r * 0.18 });
-  if (carved) {
-    const f = (lx, ly, sx, sy) => {
-      const c = Math.cos(ry), s = Math.sin(ry);
-      const lz = r * 0.86;
-      B.add(GEO.box, '#ffb03a', { x: x + lx * c + lz * s, y: y + r * 0.62 + ly, z: z - lx * s + lz * c, ry, sx, sy, sz: r * 0.2 }, 'lamp');
-    };
-    f(-r * 0.32, r * 0.2, r * 0.26, r * 0.22);
-    f(r * 0.32, r * 0.2, r * 0.26, r * 0.22);
-    f(0, -r * 0.2, r * 0.7, r * 0.16);
-    glows?.add({ x, y: y + r * 0.7, z }, '#ff9a2a', r * 5, 0, 1);
-  }
-}
+// positions of the bigger yard props, handy for screenshots/debugging
+const spots = (globalThis.__decorSpots = globalThis.__decorSpots || []);
 
 function addTombstone(B, x, y, z, ry, s = 1) {
   B.add(GEO.box, '#8e9196', { x, y: y + 0.45 * s, z, ry, rx: (Math.random() - 0.5) * 0.15, sx: 0.85 * s, sy: 0.9 * s, sz: 0.18 * s });
@@ -37,26 +24,10 @@ function addTombstone(B, x, y, z, ry, s = 1) {
 }
 
 function addInflatable(B, glows, x, y, z, ry, kind) {
-  if (kind === 'ghost') {
-    B.add(GEO.sphere, '#f6f6fa', { x, y: y + 1.0, z, sx: 1.4, sy: 2.0, sz: 1.3 });
-    B.add(GEO.sphere, '#f6f6fa', { x, y: y + 2.3, z, sx: 1.0, sy: 1.0, sz: 0.95 });
-    for (const s of [-1, 1]) {
-      const c = Math.cos(ry), sn = Math.sin(ry);
-      B.add(GEO.sphere, '#151518', { x: x + s * 0.28 * c + 0.88 * sn, y: y + 2.4, z: z - s * 0.28 * sn + 0.88 * c, sx: 0.16, sy: 0.24, sz: 0.08, ry });
-    }
-    glows?.add({ x, y: y + 1.5, z }, '#cfd8ff', 4, 0, 0);
-  } else if (kind === 'pumpkin') {
-    addPumpkin(B, glows, x, y, z, 1.3, ry, true);
-  } else {
-    // black cat
-    B.add(GEO.sphere, '#1b1a20', { x, y: y + 0.9, z, sx: 1.0, sy: 1.3, sz: 0.9 });
-    B.add(GEO.sphere, '#1b1a20', { x, y: y + 2.1, z, sx: 0.8, sy: 0.75, sz: 0.75 });
-    for (const s of [-1, 1]) {
-      const c = Math.cos(ry), sn = Math.sin(ry);
-      B.add(GEO.cone4, '#1b1a20', { x: x + s * 0.45 * c, y: y + 2.75, z: z - s * 0.45 * sn, ry, sx: 0.4, sy: 0.6, sz: 0.3 });
-      B.add(GEO.sphere, '#c8f04a', { x: x + s * 0.27 * c + 0.68 * sn, y: y + 2.2, z: z - s * 0.27 * sn + 0.68 * c, sx: 0.14, sy: 0.18, sz: 0.06 }, 'lamp');
-    }
-  }
+  spots.push({ kind, x, y, z, ry });
+  if (kind === 'ghost') addGhost(B, glows, x, y, z, ry);
+  else if (kind === 'pumpkin') addPumpkin(B, glows, x, y, z, 1.3, ry, true);
+  else addCat(B, x, y, z, ry);
 }
 
 function addHayDisplay(B, glows, x, y, z, ry) {
@@ -66,23 +37,16 @@ function addHayDisplay(B, glows, x, y, z, ry) {
     const lx = -0.9 + (i % 3) * 0.12, lz = -0.2 + i * 0.1;
     B.add(GEO.cone, '#c2a24a', { x: x + lx * c + lz * s, y: y + 1.4, z: z - lx * s + lz * c, sx: 0.25, sy: 2.6, sz: 0.25, rz: (i - 2) * 0.06 });
   }
-  B.add(GEO.sphere, '#c4501f', { x: x + 0.4, y: y + 1.0, z, s: 0.45 });
-  B.add(GEO.sphere, '#f0e6c8', { x: x - 0.3, y: y + 0.95, z: z + 0.1, s: 0.38 });
-  addPumpkin(B, glows, x + 0.9, y, z + 0.6, 0.35, ry, false);
+  const c = Math.cos(ry), sn = Math.sin(ry);
+  const L = (lx, lz) => ({ x: x + lx * c + lz * sn, z: z - lx * sn + lz * c });
+  let p = L(0.35, 0.05); addPumpkin(B, null, p.x, y + 0.8, p.z, 0.4, ry + 0.5, false, '#c4501f');
+  p = L(-0.35, 0.1); addPumpkin(B, null, p.x, y + 0.8, p.z, 0.33, ry - 0.4, false, '#f0e6c8');
+  p = L(0.9, 0.7); addPumpkin(B, glows, p.x, y, p.z, 0.35, ry, false);
 }
 
 function addSkeleton(B, x, y, z, ry) {
-  const c = Math.cos(ry), s = Math.sin(ry);
-  const P = (lx, ly, lz) => ({ x: x + lx * c + lz * s, y: y + ly, z: z - lx * s + lz * c, ry });
-  const bone = '#efece2';
-  B.add(GEO.sphere, bone, { ...P(0, 1.55, 0), sx: 0.4, sy: 0.42, sz: 0.4 });
-  for (const sx of [-1, 1]) B.add(GEO.sphere, '#151518', { ...P(sx * 0.12, 1.58, 0.18), sx: 0.08, sy: 0.1, sz: 0.05 });
-  B.add(GEO.box, bone, { ...P(0, 1.05, 0), sx: 0.08, sy: 0.75, sz: 0.08 });
-  for (let i = 0; i < 4; i++) B.add(GEO.box, bone, { ...P(0, 1.3 - i * 0.12, 0.02), sx: 0.42 - i * 0.04, sy: 0.04, sz: 0.2 });
-  for (const sx of [-1, 1]) {
-    B.add(GEO.box, bone, { ...P(sx * 0.3, 1.0, 0), rz: sx * 0.4, sx: 0.05, sy: 0.6, sz: 0.05 });
-    B.add(GEO.box, bone, { ...P(sx * 0.12, 0.35, 0), sx: 0.06, sy: 0.7, sz: 0.06 });
-  }
+  spots.push({ kind: 'skeleton', x, y, z, ry });
+  buildSkeleton(B, x, y, z, ry);
 }
 
 function addStringLights(B, glows, s, colors) {
@@ -134,24 +98,51 @@ export function decorateNeighborhood(B, glows, specs, heightAt) {
   }
 }
 
-// Street lamps along the neighborhood roads
-export function addStreetLamps(B, glows, heightAt) {
+// Street lamps along the neighborhood roads. They stand in the grass strip
+// between the curb and the sidewalk, never on pavement, sidewalks, driveways
+// or front walks. `avoid` = driveways + walkways ({ a, b, width }).
+const STRIP_IN = 0.6, STRIP_OUT = 1.8; // grass strip runs ~0.25..2.1 past the road edge
+export function addStreetLamps(B, glows, heightAt, avoid = []) {
   const lamps = [];
+  const ok = (x, z, own) => {
+    for (const r of roadLines) {
+      const d = polylineDistance(x, z, r.line).d - r.width / 2;
+      if (r.sidewalks) {
+        if (r === own ? d < STRIP_IN || d > STRIP_OUT : d < STRIP_IN || (d > STRIP_OUT && d < 4.0)) return false;
+      } else if (d < 1.5) return false;
+    }
+    const dc = Math.hypot(x - culDeSac.x, z - culDeSac.z) - culDeSac.r;
+    if (dc > -culDeSac.r + culDeSac.island - 0.5 && (dc < STRIP_IN || (dc > STRIP_OUT && dc < 4.0))) return false;
+    for (const w of avoid) if (polylineDistance(x, z, [w.a, w.b]).d < w.width / 2 + 0.8) return false;
+    if (polylineDistance(x, z, trailLine).d < 2.5) return false;
+    return !lamps.some((l) => Math.hypot(l.x - x, l.z - z) < 18);
+  };
+  const SPACING = 34;
   for (const r of roadLines) {
     if (!r.sidewalks) continue;
-    const pts = resample(r.line, 34);
-    pts.forEach((p, i) => {
-      if (i === 0) return;
-      const q = pts[Math.min(i + 1, pts.length - 1)], o = pts[i - 1];
+    const pts = resample(r.line, 1.5);
+    let next = SPACING * 0.5, run = 0, side = 1;
+    for (let i = 1; i < pts.length - 1; i++) {
+      run += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
+      if (run < next) continue;
+      const q = pts[i + 1], o = pts[i - 1];
       const dx = q.x - o.x, dz = q.z - o.z, L = Math.hypot(dx, dz) || 1;
-      const side = i % 2 ? 1 : -1;
-      const off = r.width / 2 + 2.4;
-      const x = p.x + (-dz / L) * off * side, z = p.z + (dx / L) * off * side;
-      if (lamps.some((l) => Math.hypot(l.x - x, l.z - z) < 18)) return;
-      lamps.push({ x, z });
-    });
+      const off = r.width / 2 + (STRIP_IN + STRIP_OUT) / 2;
+      // try this side, then the other; if neither works, keep walking a bit
+      for (const sd of [side, -side]) {
+        const x = pts[i].x + (-dz / L) * off * sd, z = pts[i].z + (dx / L) * off * sd;
+        if (ok(x, z, r)) { lamps.push({ x, z }); next = run + SPACING; side = -sd; break; }
+      }
+    }
+  }
+  // a few around the cul-de-sac
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2 + 0.3, R = culDeSac.r + (STRIP_IN + STRIP_OUT) / 2;
+    const x = culDeSac.x + Math.cos(a) * R, z = culDeSac.z + Math.sin(a) * R;
+    if (ok(x, z, null)) lamps.push({ x, z });
   }
   for (const l of lamps) {
+    spots.push({ kind: 'lamp', ...l });
     const y = heightAt(l.x, l.z);
     B.add(GEO.cylLo, '#24272b', { x: l.x, y: y + 2.2, z: l.z, sx: 0.16, sy: 4.4, sz: 0.16 });
     B.add(GEO.cylLo, '#24272b', { x: l.x, y: y + 0.25, z: l.z, sx: 0.32, sy: 0.5, sz: 0.32 });
@@ -323,12 +314,7 @@ export function hauntHome(B, glows, scene, s, heightAt) {
   // black cat on the steps
   {
     const p = W(s.doorX + 0.75, s.D / 2 + 1.0);
-    B.add(GEO.sphere, '#16151a', { x: p.x, y: p.y + 0.55, z: p.z, sx: 0.32, sy: 0.4, sz: 0.36 });
-    B.add(GEO.sphere, '#16151a', { x: p.x, y: p.y + 0.95, z: p.z + 0.05, s: 0.28 });
-    for (const sd of [-1, 1]) {
-      B.add(GEO.cone4, '#16151a', { x: p.x + sd * 0.1, y: p.y + 1.16, z: p.z, sx: 0.12, sy: 0.18, sz: 0.08 });
-      B.add(GEO.sphere, '#c8f04a', { x: p.x + sd * 0.07, y: p.y + 0.98, z: p.z + 0.18, sx: 0.04, sy: 0.05, sz: 0.02 }, 'lamp');
-    }
+    addCat(B, p.x, p.y + 0.35, p.z, s.rot, 0.4);
   }
   // giant (friendly) spider on the roof
   {

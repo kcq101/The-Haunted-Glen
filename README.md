@@ -38,6 +38,7 @@ src/config.js         map layout (roads, houses, woods, trail, store) and the bo
 src/terrain.js        ground shape and painted ground (roads, sidewalks, creek, trail)
 src/houses.js         house builder (home is modeled on the street view)
 src/decor.js          Halloween decorations, street lamps, trail lanterns, haunted extras
+src/props.js          jack-o'-lanterns, inflatable ghost, black cat, skeleton
 src/nature.js         fall trees and falling leaves
 src/sky.js            golden hour / night cycle
 src/backdrop.js       the world beyond: farm fields, barns and hazy hills on the horizon
