@@ -26,6 +26,7 @@ export class Controls {
       this.keys.add(e.code);
       if (e.code === 'Space') { this.onJump?.(); e.preventDefault(); }
       if (e.code === 'KeyR') this.onSpin?.();
+      if (e.code === 'KeyT') this.onScooter?.();
       if (e.code === 'Enter' || e.code === 'KeyF') this.onAction?.();
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));

@@ -384,8 +384,52 @@ if (dot(uOn, vec4(1.0)) > 0.0) {
     // chibi eyes sit well below the middle of the big head
     d.faceDY = face ? (face.y - d.headY) * 0.5 : 0;
     d.torsoL = d.shoulderY - d.hipY;
+    // arms, for holding a scooter's handlebar
+    const el = wp(this.bones.LeftForeArm), wr = wp(this.bones.LeftHand);
+    d.arm = { upper: sh.distanceTo(el), fore: el.distanceTo(wr), shoulderY: sh.y, shoulderX: Math.abs(sh.x) };
     this.d = d;
   }
+
+  // --- riding a scooter -----------------------------------------------------
+  // Two-bone reach: put each wrist on a handlebar grip ({ left, right } world positions), with
+  // the elbows bending down and out. Runs after the animation each frame.
+  reachTo(targets) {
+    this.root.updateMatrixWorld(true);
+    for (const side of ['Left', 'Right']) {
+      const up = this.bones[`${side}Arm`], fore = this.bones[`${side}ForeArm`], hand = this.bones[`${side}Hand`];
+      up.getWorldPosition(_a);
+      const t = side === 'Left' ? targets.left : targets.right;
+      fore.getWorldPosition(_b); hand.getWorldPosition(_c);
+      const a = _a.distanceTo(_b), b = _b.distanceTo(_c);
+      _d.subVectors(t, _a);
+      const dist = Math.min(_d.length(), (a + b) * 0.999);
+      _d.normalize();
+      // elbow bend: rotate the upper arm off the straight line toward the pole
+      const cosA = (a * a + dist * dist - b * b) / (2 * a * dist);
+      const ang = Math.acos(Math.max(-1, Math.min(1, cosA)));
+      _pole.set(side === 'Left' ? 0.6 : -0.6, -1, -0.4).applyQuaternion(this.body.getWorldQuaternion(_q2)).normalize();
+      _axis.crossVectors(_d, _pole);
+      if (_axis.lengthSq() < 1e-6) _axis.set(1, 0, 0);
+      _axis.normalize();
+      _e.copy(_d).applyAxisAngle(_axis, ang); // upper arm direction
+      aimBone(up, _a, _b, _e);
+      fore.getWorldPosition(_b);
+      hand.getWorldPosition(_c);
+      _e.subVectors(t, _b).normalize();
+      aimBone(fore, _b, _c, _e);
+    }
+  }
+
+  // A kick: swing the right leg back and bend the knee (amount 0..1).
+  kick(amount) {
+    if (amount <= 0) return;
+    this.root.updateMatrixWorld(true);
+    _axis.set(1, 0, 0).applyQuaternion(this.body.getWorldQuaternion(_q2)); // kid's left-right axis
+    rotateBoneWorld(this.bones.RightUpLeg, _axis, -0.75 * amount);
+    rotateBoneWorld(this.bones.RightLeg, _axis, 0.9 * amount);
+    rotateBoneWorld(this.bones.LeftLeg, _axis, 0.12 * amount);
+  }
+
 
   // Costume anchors follow bones. Anchor rest spots are given in body space.
   bindAnchors(anchors, body) {
@@ -431,4 +475,28 @@ function noScale(m) {
   m.decompose(_p, _q, _s);
   // keep the model's overall scale out of the anchor (costumes are in meters)
   return _n.compose(_p, _q, _s.set(1, 1, 1));
+}
+
+
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _e = new THREE.Vector3();
+const _pole = new THREE.Vector3(), _axis = new THREE.Vector3();
+const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
+
+// Turn a bone (at world point p, its child at c) so the child points along dir.
+function aimBone(bone, p, c, dir) {
+  _d.subVectors(c, p).normalize();
+  _q1.setFromUnitVectors(_d, dir);
+  applyWorldRot(bone, _q1);
+}
+function rotateBoneWorld(bone, axis, ang) {
+  if (!bone) return;
+  _q1.setFromAxisAngle(axis, ang);
+  applyWorldRot(bone, _q1);
+}
+function applyWorldRot(bone, q) {
+  bone.getWorldQuaternion(_q2);
+  _q2.premultiply(q);
+  bone.parent.getWorldQuaternion(_q3);
+  bone.quaternion.copy(_q3.invert().multiply(_q2));
+  bone.updateMatrixWorld(true);
 }

@@ -19,6 +19,7 @@ import { initFitTuner } from './fittuner.js';
 import { HauntedHouse, CORN_TOTAL, CORN_REWARDS } from './haunted2d.js';
 import { initAudio, sfx, setMuted, isMuted, updateAmbient } from './audio.js';
 import { loadSave, writeSave } from './save.js';
+import { preloadScooters } from './scooter.js';
 import { clamp } from './util.js';
 
 const $ = (id) => document.getElementById(id);
@@ -164,7 +165,7 @@ function placeAtHome() {
 // ---------------------------------------------------------------------------
 // Collision helpers
 // ---------------------------------------------------------------------------
-const R = 0.38;
+let R = 0.38; // a bit wider on a scooter
 function pushOut(p) {
   for (const c of W.colliders) {
     const dx = p.x - c.x, dz = p.z - c.z;
@@ -361,6 +362,7 @@ function enterHaunted() {
   fadeTo(() => {
     mode = 'haunted';
     controls.reset();
+    ride.v = 0;
     hideToast();
     canvas.classList.add('hidden');
     $('haunted').classList.remove('hidden');
@@ -435,6 +437,7 @@ function enterShop() {
     controls.enabled = false;
     hideToast();
     const I = W.interior;
+    parkScooters(true);
     I.scene.add(kids[current].root, kids[other()].root);
     shopPage = 0;
     setShopTargets(true);
@@ -458,6 +461,8 @@ function leaveShop() {
     camera.updateProjectionMatrix();
     controls.enabled = true;
     scene.add(kids[current].root, kids[other()].root);
+    parkScooters(false);
+    ride.v = 0;
     $('shop').classList.add('hidden');
     $('hud').classList.remove('hidden');
     const d = W.store.door;
@@ -659,6 +664,34 @@ function swapKid() {
 // ---------------------------------------------------------------------------
 // Controls + buttons
 // ---------------------------------------------------------------------------
+// --- scooters ----------------------------------------------------------------
+const ride = { on: false, v: 0, busy: false };
+const SCOOT = {
+  top: 1.45, // top speed vs. running
+  boost: 1.3, // ⚡ on a scooter
+  accel: 6.5, // m/s² while pushing
+  coast: 1.6, // slows this much (m/s²) when you let go
+  brake: 9, // pulling back on the stick
+  turn: 3.4, // radians per second at low speed…
+  turnFast: 2.2, // …and at top speed
+};
+async function setScooter(on) {
+  if (ride.busy) return;
+  ride.busy = true;
+  $('btn-scooter').classList.toggle('on', on);
+  if (on) toast('🛴 Scooter time!', 1.6);
+  const ok = await kids[current].setRiding(on);
+  await kids[other()].setRiding(on);
+  ride.busy = false;
+  if (on && !ok) { $('btn-scooter').classList.remove('on'); toast("The scooters aren't ready yet. Try again!", 2.5); kids[other()].setRiding(false); return; }
+  ride.on = on;
+  ride.v = 0;
+  R = on ? 0.48 : 0.38;
+  if (!on) toast('Back on foot! 👟', 1.4);
+}
+// riding stays on between the shop and the street, but the scooters park outside
+const parkScooters = (park) => { for (const k of Object.values(kids)) if (k.scooter) { k.scooter.group.visible = !park && ride.on; k.rideLift = !park && ride.on ? k.scooter.deckH : 0; k.riding = !park && ride.on; if (park) { k.body.rotation.set(0, 0, 0); k.lean = 0; } } };
+
 const controls = new Controls($('touch-layer'));
 controls.onAction = () => doAction();
 controls.onJump = () => { if (mode === 'world' && kids[current].jumpY === 0 && !kids[current].spinning) { kids[current].jump(); sfx.jump(); } };
@@ -678,6 +711,8 @@ const pressBtn = (el, fn) => el.addEventListener('pointerdown', (e) => {
 });
 pressBtn($('btn-jump'), () => controls.onJump());
 pressBtn($('btn-spin'), () => controls.onSpin());
+pressBtn($('btn-scooter'), () => { if (mode === 'world') setScooter(!ride.on); });
+controls.onScooter = () => { if (mode === 'world') setScooter(!ride.on); };
 {
   const b = $('btn-boost');
   const on = (e) => { e.preventDefault(); e.stopPropagation(); initAudio(); try { b.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ } if (!controls.boostTouch) sfx.boost(); controls.boostTouch = true; b.classList.add('held'); };
@@ -692,7 +727,7 @@ $('btn-sound').addEventListener('click', () => {
   setMuted(!isMuted());
   $('btn-sound').textContent = isMuted() ? '🔇' : '🔊';
 });
-for (const b of [$('btn-action'), $('btn-jump'), $('btn-spin'), $('btn-boost'), $('btn-swap'), $('btn-time'), $('btn-sound')]) {
+for (const b of [$('btn-action'), $('btn-jump'), $('btn-spin'), $('btn-scooter'), $('btn-boost'), $('btn-swap'), $('btn-time'), $('btn-sound')]) {
   b.addEventListener('pointerdown', (e) => e.stopPropagation());
 }
 
@@ -767,13 +802,15 @@ function updateWorld(dt) {
   else autoCam.pause = Math.max(0, autoCam.pause - dt);
 
   let moving = false;
-  const spinning = kid.spinning;
+  const riding = ride.on && kid.riding;
+  const spinning = kid.spinning && !riding;
   const boosting = controls.boost && inp.mag > 0.02 && !spinning;
   const airLeap = kid.jumpY > 0 ? AIR_LEAP : 1; // a jump while running carries them a bit further
   const speed = CHARACTERS[current].speed * (boosting ? BOOST : 1) * airLeap;
-  if (player.busy > 0) player.busy -= dt;
+  kid.push = false;
+  if (player.busy > 0) { player.busy -= dt; ride.v = Math.max(0, ride.v - SCOOT.brake * dt); }
   else if (spinning) { /* the spin carries them forward on its own (below) */ }
-  else if (inp.mag > 0.02) {
+  else if (riding || inp.mag > 0.02) {
     // camera-relative movement. While the stick is held, steer relative to
     // where the camera was when they started, so an auto-pan doesn't curve
     // their path; re-sync when they push a clearly different way.
@@ -787,14 +824,38 @@ function updateWorld(dt) {
     const rx = -fz, rz = fx;
     const mx = fx * inp.y + rx * inp.x, mz = fz * inp.y + rz * inp.x;
     const L = Math.hypot(mx, mz) || 1;
-    player.x += (mx / L) * speed * inp.mag * dt;
-    player.z += (mz / L) * speed * inp.mag * dt;
     const targetYaw = Math.atan2(mx, mz);
     let dy = targetYaw - player.yaw;
     while (dy > Math.PI) dy -= Math.PI * 2;
     while (dy < -Math.PI) dy += Math.PI * 2;
-    player.yaw += dy * Math.min(1, dt * 12);
-    moving = true;
+    if (riding) {
+      // A scooter rolls where it points: steer toward the stick, push off to
+      // speed up, coast when you let go, and brake by pulling the other way.
+      const top = CHARACTERS[current].speed * SCOOT.top * (controls.boost ? SCOOT.boost : 1);
+      const stick = inp.mag > 0.02;
+      if (stick) {
+        const back = Math.abs(dy) > 2.4 && ride.v > 1.5;
+        const rate = SCOOT.turn + (SCOOT.turnFast - SCOOT.turn) * Math.min(1, ride.v / top);
+        if (!back) player.yaw += clamp(dy, -rate * dt, rate * dt);
+        if (back) ride.v = Math.max(0, ride.v - SCOOT.brake * dt);
+        else if (ride.v < top * inp.mag) { ride.v = Math.min(top * inp.mag, ride.v + SCOOT.accel * dt * (Math.abs(dy) > 1.5 ? 0.4 : 1)); kid.push = ride.v < top * inp.mag * 0.97; }
+        else ride.v = Math.max(top * inp.mag, ride.v - SCOOT.coast * 2 * dt);
+      } else ride.v = Math.max(0, ride.v - SCOOT.coast * dt);
+      const ox = player.x, oz = player.z;
+      player.x += Math.sin(player.yaw) * ride.v * dt;
+      player.z += Math.cos(player.yaw) * ride.v * dt;
+      pushOut(player);
+      // bumping into a wall or tree slows you down
+      const want = ride.v * dt, got = Math.hypot(player.x - ox, player.z - oz);
+      if (want > 1e-4 && got < want * 0.7) ride.v *= Math.max(0.2, got / want);
+      moving = ride.v > 0.4;
+      if (!stick) { autoCam.ctrlYaw = null; }
+    } else {
+      player.x += (mx / L) * speed * inp.mag * dt;
+      player.z += (mz / L) * speed * inp.mag * dt;
+      player.yaw += dy * Math.min(1, dt * 12);
+      moving = true;
+    }
     // slowly pan the camera back behind the kid if they keep going another way
     const cd = wrapAng(player.yaw + Math.PI - cam.yaw);
     const near = Math.abs(cd) < (autoCam.following ? AUTO_CAM.settle : AUTO_CAM.ignore);
@@ -811,15 +872,17 @@ function updateWorld(dt) {
       cam.yaw += turn;
       cam.pitch += (AUTO_CAM.pitch - cam.pitch) * Math.min(1, dt * 0.6 * ease);
     }
-    stepT -= dt * inp.mag * (boosting ? BOOST : 1);
-    if (stepT < 0) { stepT = 0.32; if (kid.jumpY === 0) sfx.step(); }
+    if (!riding) {
+      stepT -= dt * inp.mag * (boosting ? BOOST : 1);
+      if (stepT < 0) { stepT = 0.32; if (kid.jumpY === 0) sfx.step(); }
+    }
   }
   if (!moving) { autoCam.ctrlYaw = null; autoCam.following = false; autoCam.t = 0; } // stopping restarts the wait
   pushOut(player);
   player.y = groundY(player.x, player.z);
   kid.root.position.set(player.x, player.y, player.z);
   kid.root.rotation.y = player.yaw;
-  const spinAdv = kid.update(dt, moving, inp.mag, time, boosting ? BOOST_ANIM : 1);
+  const spinAdv = kid.update(dt, moving && !riding, inp.mag, time, boosting ? BOOST_ANIM : 1);
   if (spinAdv) {
     player.x += Math.sin(player.yaw) * spinAdv;
     player.z += Math.cos(player.yaw) * spinAdv;
@@ -834,13 +897,14 @@ function updateWorld(dt) {
   const behindZ = player.z - Math.cos(player.yaw) * 1.9 - Math.sin(player.yaw) * 1.0;
   const fdx = behindX - follower.x, fdz = behindZ - follower.z, fd = Math.hypot(fdx, fdz);
   let fMoving = false;
-  if (fd > 3.2) {
+  if (fd > (riding ? 6 : 3.2)) {
     // teleport if left far behind (e.g. after a door)
     follower.x = behindX; follower.z = behindZ;
   } else if (fd > 0.6) {
-    const sp = Math.min(speed * 1.05, fd * 3) * (fk.spinning ? 0.4 : 1);
+    const sp = riding ? Math.min(Math.max(ride.v * 1.08, 2), fd * 3) : Math.min(speed * 1.05, fd * 3) * (fk.spinning ? 0.4 : 1);
     follower.x += (fdx / fd) * sp * dt; follower.z += (fdz / fd) * sp * dt;
-    follower.yaw = Math.atan2(fdx, fdz);
+    const fy = Math.atan2(fdx, fdz);
+    if (riding) { let d = fy - follower.yaw; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; follower.yaw += d * Math.min(1, dt * 5); } else follower.yaw = fy;
     fMoving = true;
   } else {
     let dy = Math.atan2(player.x - follower.x, player.z - follower.z) - follower.yaw;
@@ -852,7 +916,8 @@ function updateWorld(dt) {
   follower.y = groundY(follower.x, follower.z);
   fk.root.position.set(follower.x, follower.y, follower.z);
   fk.root.rotation.y = follower.yaw;
-  fk.update(dt, fMoving, Math.min(1, fd / 2), time + 1.3, boosting && fMoving ? BOOST_ANIM : 1);
+  fk.push = riding && fMoving && kid.push;
+  fk.update(dt, fMoving && !riding, Math.min(1, fd / 2), time + 1.3, boosting && fMoving ? BOOST_ANIM : 1);
 
   // day / night
   const prevT = sky.t;
@@ -1097,9 +1162,10 @@ requestAnimationFrame(() => setTimeout(async () => {
   $('play-label').textContent = "Let's go! 🎃";
   updateCounters();
   requestAnimationFrame(frame);
+  setTimeout(() => preloadScooters().catch(() => {}), 1500); // ready before anyone taps 🛴
 }, 30));
 
 initFitTuner({ getKid: () => kids[current], isShop: () => mode === 'shop' });
 
 // handy for testing from the console
-window.__game = { shopCam, get preview() { return preview; }, setShopPage: (i) => setShopPage(i), shopSnap: () => { setShopTargets(true); shopCam.snap = true; }, tryOnId: (id) => tryOn(ITEM[id]), save, sky, player, cam, autoCam, W, kids, get mode() { return mode; }, enterShop, enterHaunted, renderer, scene, camera, get action() { return currentAction; }, doAction, haunted };
+window.__game = { shopCam, get preview() { return preview; }, setShopPage: (i) => setShopPage(i), shopSnap: () => { setShopTargets(true); shopCam.snap = true; }, tryOnId: (id) => tryOn(ITEM[id]), save, sky, player, cam, autoCam, W, kids, get mode() { return mode; }, enterShop, enterHaunted, renderer, scene, camera, get action() { return currentAction; }, doAction, haunted, ride, setScooter };

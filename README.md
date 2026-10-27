@@ -15,11 +15,12 @@ Open the GitHub Pages link on the tablet, then **Share → Add to Home Screen** 
 | Orange button | Knock, enter, go shopping, BOO! |
 | Purple button ⤴ | Jump (works while running, too) |
 | Blue button ⚡ | Hold for a speed boost |
-| Pink button 🌀 | 360 power spin jump |
+| Pink button 🌀 | 360 power spin jump (a scooter 360 when riding) |
+| Green button 🛴 | Hop on (or off) the scooters: Carter's blue, Jack's red. Push the stick to kick off, let go to coast, pull back to brake |
 | Kid button (top right) | Switch between Carter and Jack (the other brother follows along) |
 | 🌅 ☀️ 🌇 🌙 | Skip ahead: morning → noon → golden hour → night |
 
-Keyboard also works: WASD/arrows to walk, Q/E to turn, Space to jump, Shift to boost, R to spin, Enter to use the orange button.
+Keyboard also works: WASD/arrows to walk, Q/E to turn, Space to jump, Shift to boost, R to spin, T for the scooter, Enter to use the orange button.
 
 ### The loop
 - **Trick-or-treat:** every glowing door gives 2–4 candy once per night. A full day (morning, noon, golden hour, night) takes 12 minutes; each time night falls the doors glow again.
@@ -51,7 +52,8 @@ src/fittuner.js       on-phone fit tuner (open the game with ?fit=1)
 data/costume_fit.json     fit tweaks for each piece on Carter and Jack
 data/costume_models.json  GPT/Meshy models and outfit prints that replace built-in pieces
 src/character.js      the kids + costume anchors (stand-in body until the model loads)
-src/meshykid.js       loads the Meshy boys: animation, bone anchors, outfit recolor
+src/meshykid.js       loads the Meshy boys: animation, bone anchors, outfit recolor, hands on the handlebar
+src/scooter.js        Meshy kick scooters + wheels (axle and grip spots for each model)
 src/haunted2d.js      the 2D haunted house
 src/kidsprites.js     Carter and Jack's pixel sprites (atlas, outfit recolor, costume spots)
 src/audio.js          sound effects (synthesized, no files needed)

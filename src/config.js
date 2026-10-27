@@ -29,6 +29,7 @@ export const CHARACTERS = {
     age: 7,
     height: 1.3,
     model: 'assets/models/carter.glb',
+    scooter: 'blue', // src/scooter.js
     // eyes on the model's face texture (UV center x, y, radius x, y) + eyelid skin, for blinking
     eyeUV: [[0.4785, 0.9207, 0.0264, 0.0242], [0.564, 0.9236, 0.0283, 0.0237]],
     lid: '#fda582',
@@ -46,6 +47,7 @@ export const CHARACTERS = {
     age: 4,
     height: 1.06,
     model: 'assets/models/jack.glb',
+    scooter: 'red',
     eyeUV: [[0.0894, 0.9109, 0.0342, 0.0281], [0.198, 0.897, 0.0315, 0.0283]],
     lid: '#fea583',
     skin: '#f4ccad',

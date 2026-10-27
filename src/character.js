@@ -3,6 +3,7 @@ import { litMat, q } from './quality.js';
 import { ITEM, outfitTexture } from './costumes.js';
 import { MeshyBody } from './meshykid.js';
 import { fitFor, fitWrap, kidKey } from './costumefit.js';
+import { buildScooter } from './scooter.js';
 
 // A cozy, chunky kid built from rounded shapes. Costume pieces snap onto
 // anchors (head, hand, shoulder, back, waist, neck). This is the stand-in;
@@ -142,6 +143,70 @@ export class Kid {
     this.jumpV = 0;
     this.jumpY = 0;
     this.twirlT = -1;
+    // scooter
+    this.scooter = null; // built on first ride
+    this.riding = false;
+    this.rideLift = 0;
+    this.rideSpinT = -1;
+    this.lean = 0;
+    this.kickT = -1;
+    this.push = false; // set by the game while the rider is pushing off
+    this.lastPos = new THREE.Vector3();
+    this.lastYaw = 0;
+  }
+
+  // Hop on (or off) the scooter. Builds it the first time.
+  async setRiding(on) {
+    this.riding = on;
+    if (on && !this.scooter && this.cfg.scooter) {
+      if (!this.scooterLoading) {
+        const H = this.cfg.height, a = this.d.arm;
+        const fit = a ? { shoulderY: a.shoulderY, shoulderX: a.shoulderX, reach: a.upper + a.fore } : { shoulderY: H * 0.62, shoulderX: H * 0.14, reach: H * 0.36 };
+        this.scooterLoading = buildScooter(this.cfg.scooter, fit).then((sc) => { this.scooter = sc; this.body.add(sc.group); }).catch((e) => console.warn("Couldn't load the scooter", e));
+      }
+      await this.scooterLoading;
+    }
+    if (this.scooter) this.scooter.group.visible = this.riding;
+    this.rideLift = this.riding && this.scooter ? this.scooter.deckH : 0;
+    this.lastPos.copy(this.root.position);
+    this.lastYaw = this.root.rotation.y;
+    if (!this.riding) { this.lean = 0; this.body.rotation.z = 0; this.rideSpinT = -1; this.body.rotation.y = 0; }
+    return !!this.scooter;
+  }
+
+  // wheels, lean and kicks; returns nothing (the game moves the kid)
+  _updateRide(dt) {
+    const sc = this.scooter;
+    const p = this.root.position;
+    const dist = Math.hypot(p.x - this.lastPos.x, p.z - this.lastPos.z);
+    let dyaw = this.root.rotation.y - this.lastYaw;
+    while (dyaw > Math.PI) dyaw -= Math.PI * 2;
+    while (dyaw < -Math.PI) dyaw += Math.PI * 2;
+    this.lastPos.copy(p);
+    this.lastYaw = this.root.rotation.y;
+    if (dist > 2) return; // teleported (doors, swapping)
+    const v = dist / Math.max(dt, 1e-4);
+    this.rideSpeed = v;
+    for (const w of sc.wheels) w.rotation.z += dist / sc.wheelR;
+    // lean into turns
+    const target = Math.max(-0.32, Math.min(0.32, -(dyaw / Math.max(dt, 1e-4)) * Math.min(v, 9) * 0.035));
+    this.lean += (target - this.lean) * Math.min(1, dt * 6);
+    this.body.rotation.z = this.lean;
+    // trick spin: a full turn with a hop
+    if (this.rideSpinT >= 0) {
+      this.rideSpinT += dt;
+      const t = Math.min(1, this.rideSpinT / 0.75);
+      this.body.rotation.y = Math.PI * 2 * (t * t * (3 - 2 * t));
+      if (t >= 1) { this.rideSpinT = -1; this.body.rotation.y = 0; }
+    }
+    // kicks while pushing off
+    if (this.kickT >= 0) { this.kickT += dt; if (this.kickT > 0.9) this.kickT = -1; }
+    else if (this.push && this.jumpY === 0 && this.rideSpinT < 0) this.kickT = 0;
+  }
+
+  get kickAmount() {
+    if (this.kickT < 0 || this.kickT > 0.55) return 0;
+    return Math.sin((this.kickT / 0.55) * Math.PI);
   }
 
   async loadModel(url) {
@@ -225,14 +290,21 @@ export class Kid {
     const target = moving ? speed01 : 0;
     this.speed += (target - this.speed) * Math.min(1, dt * 10);
     this.walkPhase += dt * (6 + this.speed * 7 * boost) * (this.speed > 0.05 ? 1 : 0);
+    const riding = this.riding && this.scooter;
+    if (riding) this._updateRide(dt);
     if (this.model) {
-      const adv = this.model.update(dt, this.speed, boost);
+      const adv = this.model.update(dt, riding ? 0 : this.speed, boost);
       if (this.jumpY > 0 || this.jumpV > 0) {
         this.jumpV -= 18 * dt;
         this.jumpY = Math.max(0, this.jumpY + this.jumpV * dt);
         if (this.jumpY === 0) this.jumpV = 0;
       }
-      this.body.position.y = this.jumpY;
+      this.body.position.y = this.jumpY + this.rideLift;
+      if (riding) {
+        this.body.updateMatrixWorld(true);
+        this.model.reachTo({ right: this.scooter.grips[0].getWorldPosition(_gr), left: this.scooter.grips[1].getWorldPosition(_gl) });
+        this.model.kick(this.kickAmount);
+      }
       this.model.syncAnchors();
       this.animateCostume(time);
       return adv;
@@ -259,7 +331,7 @@ export class Kid {
       this.jumpY = Math.max(0, this.jumpY + this.jumpV * dt);
       if (this.jumpY === 0) this.jumpV = 0;
     }
-    this.body.position.y = bob + breathe + this.jumpY;
+    this.body.position.y = bob + breathe + this.jumpY + this.rideLift;
     this.head.rotation.z = Math.sin(this.walkPhase * 0.5) * 0.05 * this.speed;
     // blink
     this.blinkT -= dt;
@@ -288,14 +360,17 @@ export class Kid {
     if (this.jumpY === 0 && !this.spinning) this.jumpV = 5.5;
   }
 
-  get spinning() { return this.model ? this.model.spinning : this.twirlT >= 0; }
+  get spinning() { return this.rideSpinT >= 0 || (this.model ? this.model.spinning : this.twirlT >= 0); }
 
   // the 360 power spin jump (or a twirl for the stand-in kid)
   spin() {
     if (this.spinning || this.jumpY > 0) return false;
+    if (this.riding && this.scooter) { this.rideSpinT = 0; this.jumpV = 6; return true; } // scooter 360
     if (this.model) return this.model.canSpin && this.model.startSpin(1.5);
     this.twirlT = 0;
     this.jumpV = 5;
     return true;
   }
 }
+
+const _gl = new THREE.Vector3(), _gr = new THREE.Vector3();
