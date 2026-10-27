@@ -200,14 +200,10 @@ export class Kid {
       if (t >= 1) { this.rideSpinT = -1; this.body.rotation.y = 0; }
     }
     // kicks while pushing off
-    if (this.kickT >= 0) { this.kickT += dt; if (this.kickT > 0.9) this.kickT = -1; }
+    if (this.kickT >= 0) { this.kickT += dt; if (this.kickT > KICK + 0.25) this.kickT = -1; }
     else if (this.push && this.jumpY === 0 && this.rideSpinT < 0) this.kickT = 0;
   }
 
-  get kickAmount() {
-    if (this.kickT < 0 || this.kickT > 0.55) return 0;
-    return Math.sin((this.kickT / 0.55) * Math.PI);
-  }
 
   async loadModel(url) {
     try {
@@ -302,9 +298,9 @@ export class Kid {
       this.body.position.y = this.jumpY + this.rideLift;
       if (riding) {
         this.body.updateMatrixWorld(true);
-        this.model.reachTo({ right: this.scooter.grips[0].getWorldPosition(_gr), left: this.scooter.grips[1].getWorldPosition(_gl) });
-        this.model.kick(this.kickAmount);
-      }
+        const k = this.kickT >= 0 && this.kickT < KICK ? { amount: Math.sin((this.kickT / KICK) * Math.PI), phase: this.kickT / KICK, ground: this.scooter.deckH } : null;
+        this.model.ride({ right: this.scooter.grips[0].getWorldPosition(_gr), left: this.scooter.grips[1].getWorldPosition(_gl) }, k);
+      } else this.model.unride();
       this.model.syncAnchors();
       this.animateCostume(time);
       return adv;
@@ -374,3 +370,4 @@ export class Kid {
 }
 
 const _gl = new THREE.Vector3(), _gr = new THREE.Vector3();
+const KICK = 0.6; // seconds per kick stroke

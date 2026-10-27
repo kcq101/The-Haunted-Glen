@@ -326,6 +326,7 @@ if (dot(uOn, vec4(1.0)) > 0.0) {
       if (left <= 0) { this.spinT = -1; spin.stop(); sw = 0; }
       else spin.setEffectiveWeight(sw);
     }
+    if (this._ikDirty) { for (const e of this._ikBones) e.b.quaternion.copy(e.q); this._ikDirty = false; }
     const k = 1 - sw;
     const move = smooth(0.03, 0.2, speed01);
     const r = run ? smooth(0.55, 0.8, speed01) : 0;
@@ -391,45 +392,56 @@ if (dot(uOn, vec4(1.0)) > 0.0) {
   }
 
   // --- riding a scooter -----------------------------------------------------
-  // Two-bone reach: put each wrist on a handlebar grip ({ left, right } world positions), with
-  // the elbows bending down and out. Runs after the animation each frame.
-  reachTo(targets) {
+  // Runs after the animation each frame:
+  //  grips: { left, right } handlebar grips (world positions)
+  //  kick:  { amount 0..1, phase 0..1, ground } — while kicking, the kid dips
+  //         on his left leg and plants his right foot on the road behind the
+  //         deck (ground = how far the road is below the deck), sweeping it
+  //         back to push. The hands stay on the grips throughout.
+  ride(grips, kick) {
+    if (this.baseY === undefined) this.baseY = this.root.position.y;
+    const B = this.bones;
+    // three.js only re-applies an animation when its value changes, so a held
+    // pose would keep our edits from last frame and they'd pile up. Remember
+    // the clean pose; update() puts it back before the mixer runs.
+    if (!this._ikBones) this._ikBones = ['LeftUpLeg', 'LeftLeg', 'LeftFoot', 'RightUpLeg', 'RightLeg', 'RightFoot', 'LeftArm', 'LeftForeArm', 'LeftHand', 'RightArm', 'RightForeArm', 'RightHand'].map((n) => ({ b: B[n], q: new THREE.Quaternion() }));
+    for (const e of this._ikBones) e.q.copy(e.b.quaternion);
+    this._ikDirty = true;
+    this.body.getWorldQuaternion(_bq);
+    _fwd.set(0, 0, 1).applyQuaternion(_bq);
+    _upv.set(0, 1, 0).applyQuaternion(_bq);
+    this.root.position.y = this.baseY;
     this.root.updateMatrixWorld(true);
+    const footL = B.LeftFoot.getWorldPosition(_fl), footR = B.RightFoot.getWorldPosition(_fr);
+    const leg = B.LeftUpLeg.getWorldPosition(_a).distanceTo(footL);
+    const amt = kick ? kick.amount : 0;
+    if (amt > 0) {
+      // bend the standing knee deep (foot stays put on the deck) so the
+      // other foot can reach the road
+      this.root.position.y = this.baseY - amt * leg * 0.32;
+      this.root.updateMatrixWorld(true);
+      _pole.copy(_fwd).addScaledVector(_upv, -0.2);
+      solve2(B.LeftUpLeg, B.LeftLeg, B.LeftFoot, footL, _pole);
+      // kicking foot: lands on the road just beside the deck, then sweeps back
+      _side.set(-1, 0, 0).applyQuaternion(_bq); // the kid's right
+      const back = leg * (0.95 * kick.phase - 0.1) * Math.min(1, amt * 1.6);
+      _t.copy(footR)
+        .addScaledVector(_side, 0.05 * amt)
+        .addScaledVector(_fwd, -back)
+        .addScaledVector(_upv, -kick.ground * amt);
+      solve2(B.RightUpLeg, B.RightLeg, B.RightFoot, _t, _pole);
+    }
+    // hands on the grips, elbows down and out
     for (const side of ['Left', 'Right']) {
-      const up = this.bones[`${side}Arm`], fore = this.bones[`${side}ForeArm`], hand = this.bones[`${side}Hand`];
-      up.getWorldPosition(_a);
-      const t = side === 'Left' ? targets.left : targets.right;
-      fore.getWorldPosition(_b); hand.getWorldPosition(_c);
-      const a = _a.distanceTo(_b), b = _b.distanceTo(_c);
-      _d.subVectors(t, _a);
-      const dist = Math.min(_d.length(), (a + b) * 0.999);
-      _d.normalize();
-      // elbow bend: rotate the upper arm off the straight line toward the pole
-      const cosA = (a * a + dist * dist - b * b) / (2 * a * dist);
-      const ang = Math.acos(Math.max(-1, Math.min(1, cosA)));
-      _pole.set(side === 'Left' ? 0.6 : -0.6, -1, -0.4).applyQuaternion(this.body.getWorldQuaternion(_q2)).normalize();
-      _axis.crossVectors(_d, _pole);
-      if (_axis.lengthSq() < 1e-6) _axis.set(1, 0, 0);
-      _axis.normalize();
-      _e.copy(_d).applyAxisAngle(_axis, ang); // upper arm direction
-      aimBone(up, _a, _b, _e);
-      fore.getWorldPosition(_b);
-      hand.getWorldPosition(_c);
-      _e.subVectors(t, _b).normalize();
-      aimBone(fore, _b, _c, _e);
+      _pole.set(side === 'Left' ? 0.6 : -0.6, -1, -0.4).applyQuaternion(_bq);
+      solve2(B[`${side}Arm`], B[`${side}ForeArm`], B[`${side}Hand`], side === 'Left' ? grips.left : grips.right, _pole);
     }
   }
 
-  // A kick: swing the right leg back and bend the knee (amount 0..1).
-  kick(amount) {
-    if (amount <= 0) return;
-    this.root.updateMatrixWorld(true);
-    _axis.set(1, 0, 0).applyQuaternion(this.body.getWorldQuaternion(_q2)); // kid's left-right axis
-    rotateBoneWorld(this.bones.RightUpLeg, _axis, -0.75 * amount);
-    rotateBoneWorld(this.bones.RightLeg, _axis, 0.9 * amount);
-    rotateBoneWorld(this.bones.LeftLeg, _axis, 0.12 * amount);
+  // back to normal standing height (getting off the scooter)
+  unride() {
+    if (this.baseY !== undefined) this.root.position.y = this.baseY;
   }
-
 
   // Costume anchors follow bones. Anchor rest spots are given in body space.
   bindAnchors(anchors, body) {
@@ -480,6 +492,7 @@ function noScale(m) {
 
 const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3(), _e = new THREE.Vector3();
 const _pole = new THREE.Vector3(), _axis = new THREE.Vector3();
+const _fwd = new THREE.Vector3(), _upv = new THREE.Vector3(), _fl = new THREE.Vector3(), _fr = new THREE.Vector3(), _t = new THREE.Vector3(), _side = new THREE.Vector3(), _bq = new THREE.Quaternion();
 const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _q3 = new THREE.Quaternion();
 
 // Turn a bone (at world point p, its child at c) so the child points along dir.
@@ -488,10 +501,25 @@ function aimBone(bone, p, c, dir) {
   _q1.setFromUnitVectors(_d, dir);
   applyWorldRot(bone, _q1);
 }
-function rotateBoneWorld(bone, axis, ang) {
-  if (!bone) return;
-  _q1.setFromAxisAngle(axis, ang);
-  applyWorldRot(bone, _q1);
+// Two-bone reach: turn up -> mid -> end so the end joint lands on target,
+// with the middle joint (elbow / knee) bending toward the pole direction.
+function solve2(up, mid, end, target, pole) {
+  up.parent.updateMatrixWorld(true);
+  up.updateMatrixWorld(true);
+  const p = up.getWorldPosition(new THREE.Vector3());
+  const m = mid.getWorldPosition(new THREE.Vector3());
+  const e = end.getWorldPosition(new THREE.Vector3());
+  const a = p.distanceTo(m), b = m.distanceTo(e);
+  const dir = new THREE.Vector3().subVectors(target, p);
+  const dist = Math.max(1e-4, Math.min(dir.length(), (a + b) * 0.999));
+  dir.normalize();
+  const ang = Math.acos(Math.max(-1, Math.min(1, (a * a + dist * dist - b * b) / (2 * a * dist))));
+  const axis = new THREE.Vector3().crossVectors(dir, pole);
+  if (axis.lengthSq() < 1e-8) axis.set(1, 0, 0);
+  axis.normalize();
+  aimBone(up, p, m, dir.clone().applyAxisAngle(axis, ang));
+  mid.getWorldPosition(m); end.getWorldPosition(e);
+  aimBone(mid, m, e, new THREE.Vector3().subVectors(target, m).normalize());
 }
 function applyWorldRot(bone, q) {
   bone.getWorldQuaternion(_q2);
