@@ -88,12 +88,15 @@
   <div id="title">
     <div class="title-sky"></div>
     <div class="title-inner">
-      <div class="title-logo"><span class="t1">The</span><span class="t2">Haunted Glen</span></div>
-      <div class="title-sub">A Kimberton Glen Halloween</div>
+      <div class="title-logo">
+        <span class="t1"><i class="orn">✦</i>The<i class="orn">✦</i></span>
+        <span class="t2" data-text="Haunted Glen">Haunted Glen</span>
+        <span class="t-moon" aria-hidden="true"></span>
+      </div>
       <div class="pick-label" id="pick-label">Who's playing?</div>
       <div class="pick-row">
-        <button class="pick-card selected" data-kid="carter"><div class="pick-avatar carter">C</div><div class="pick-name">Carter</div><div class="pick-age">age 7</div></button>
-        <button class="pick-card" data-kid="jack"><div class="pick-avatar jack">J</div><div class="pick-name">Jack</div><div class="pick-age">age 4</div></button>
+        <button class="pick-card selected" data-kid="carter"><div class="pick-name">Carter</div><canvas class="pick-canvas"></canvas><div class="pick-fallback carter">C</div></button>
+        <button class="pick-card" data-kid="jack"><div class="pick-name">Jack</div><canvas class="pick-canvas"></canvas><div class="pick-fallback jack">J</div></button>
       </div>
       <button class="big-btn" id="play-btn" disabled><span id="play-label">Building the neighborhood…</span></button>
       <button class="quality-btn" id="quality-btn">✨ Graphics: High</button>

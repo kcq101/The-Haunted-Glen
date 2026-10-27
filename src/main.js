@@ -20,6 +20,7 @@ import { HauntedHouse, CORN_TOTAL, CORN_REWARDS } from './haunted2d.js';
 import { initAudio, sfx, setMuted, isMuted, updateAmbient, setArea, setRoll, setCreek } from './audio.js';
 import { loadSave, writeSave } from './save.js';
 import { preloadScooters } from './scooter.js';
+import { initTitleKids } from './titlekids.js';
 import { clamp, polylineDistance } from './util.js';
 
 const $ = (id) => document.getElementById(id);
@@ -759,6 +760,7 @@ for (const b of [$('btn-action'), $('btn-jump'), $('btn-spin'), $('btn-scooter')
 }
 
 // Title screen
+initTitleKids();
 document.querySelectorAll('.pick-card').forEach((card) => {
   if (card.dataset.kid === current) card.classList.add('selected'); else card.classList.remove('selected');
   card.addEventListener('click', () => {
