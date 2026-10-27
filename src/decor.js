@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { litMat } from './quality.js';
+import { litMat, q } from './quality.js';
 import { GEO } from './builder.js';
 import { makeRng, polylineDistance, resample } from './util.js';
 import { toWorld } from './houses.js';
-import { roadLines, trailLine, creekLine, culDeSac } from './terrain.js';
-import { px, BOUNDS } from './config.js';
+import { roadLines, trailLine, creekLine, culDeSac, swales } from './terrain.js';
+import { px, BOUNDS, STOP_SIGN } from './config.js';
 import { addPumpkin, addGhost, addCat, addSkeleton as buildSkeleton } from './props.js';
 
 export { addPumpkin };
@@ -270,11 +270,18 @@ export function hauntHome(B, glows, scene, s, heightAt) {
     return { ...p, y: heightAt(p.x, p.z) };
   };
   // pumpkins lining the front walk
-  for (let i = 0; i < 8; i++) {
-    for (const side of [-1, 1]) {
-      if ((i + (side > 0 ? 1 : 0)) % 2) continue;
-      const p = W(s.doorX + side * 1.3, s.D / 2 + 2.6 + i * 1.9);
-      addPumpkin(B, glows, p.x, p.y, p.z, 0.3 + rng() * 0.12, s.rot, true, rng() < 0.2 ? '#7cbf3a' : '#ef7d1f');
+  // (the walk runs along the front of the house to the driveway)
+  {
+    const { a, b } = s.walk, L = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(1, Math.floor((L - 2) / 1.9));
+    const ux = (b.x - a.x) / L, uz = (b.z - a.z) / L;
+    for (let i = 0; i <= n; i++) {
+      for (const side of [-1, 1]) {
+        if ((i + (side > 0 ? 1 : 0)) % 2) continue;
+        if (side < 0 && i * 1.9 < 1.6) continue; // keep the foot of the steps clear
+        const t = 1.4 + i * 1.9;
+        const x = a.x + ux * t - uz * side * 1.3, z = a.z + uz * t + ux * side * 1.3;
+        addPumpkin(B, glows, x, heightAt(x, z), z, 0.3 + rng() * 0.12, s.rot, true, rng() < 0.2 ? '#7cbf3a' : '#ef7d1f');
+      }
     }
   }
   // tombstones on the lawn
@@ -416,3 +423,87 @@ export function hauntHome(B, glows, scene, s, heightAt) {
 }
 
 export { textTexture };
+
+// --- bottom of Iron Works: vegetated swales and the stop sign ----------------
+// Swales: shallow basins thick with tall native grasses (straw, tan and a bit
+// of green), a few shrubs, and a wooden marker post, like the real ones.
+const SWALE_GRASS = ['#c9b27a', '#b89b62', '#a88a55', '#d2bd8a', '#9c8a5a', '#8a9148', '#74843f', '#a39a5c'];
+export function addSwales(B, heightAt) {
+  const rng = makeRng(77);
+  const blades = q(6, 4);
+  swales.forEach((w, wi) => {
+    const area = Math.PI * w.rx * w.rz;
+    const n = Math.floor(area / q(0.75, 1.2));
+    for (let i = 0; i < n; i++) {
+      // even spread over the basin, thinning out toward the mowed edge
+      const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * 1.02;
+      if (r > 0.8 && rng() < (r - 0.8) * 4) continue;
+      const x = w.x + Math.cos(a) * r * w.rx, z = w.z + Math.sin(a) * r * w.rz, y = heightAt(x, z);
+      const col = SWALE_GRASS[(rng() * SWALE_GRASS.length) | 0];
+      const tall = (0.8 + rng() * 0.6) * (1.1 - r * 0.35);
+      // a full tussock: a soft mound with blades fanning out of it
+      const mw = 0.7 + rng() * 0.5;
+      B.add(GEO.sphereLo, col, { x, y: y + tall * 0.18, z, sx: mw, sy: tall * 0.75, sz: mw * (0.8 + rng() * 0.4), ry: rng() * 3 });
+      for (let k = 0; k < blades; k++) {
+        const ang = (k / blades) * Math.PI * 2 + rng() * 0.6, lean = 0.2 + rng() * 0.35;
+        B.add(GEO.cone4, col, {
+          x: x + Math.cos(ang) * 0.18, y: y + tall * 0.5, z: z + Math.sin(ang) * 0.18,
+          rx: Math.sin(ang) * lean, rz: -Math.cos(ang) * lean, ry: rng() * 3,
+          sx: 0.26, sy: tall, sz: 0.26,
+        });
+      }
+      // feathery seed heads on some of the tall grass
+      if (rng() < 0.2) B.add(GEO.sphereLo, '#cdb98a', { x, y: y + tall * 0.98, z, sx: 0.18, sy: 0.34, sz: 0.18 });
+    }
+    // a few rounded shrubs (one with fall red)
+    for (let i = 0; i < 9; i++) {
+      const a = rng() * Math.PI * 2, r = 0.15 + rng() * 0.6;
+      const x = w.x + Math.cos(a) * r * w.rx, z = w.z + Math.sin(a) * r * w.rz, y = heightAt(x, z);
+      const sz = 0.9 + rng() * 0.7;
+      B.add(GEO.sphereLo, i === 0 ? '#9c3b22' : rng() < 0.5 ? '#5f7a34' : '#7a7f3a', { x, y: y + sz * 0.35, z, sx: sz * 1.3, sy: sz, sz: sz * 1.2 });
+    }
+    // wooden marker post at the street-side edge
+    const side = wi === 0 ? 1 : -1; // toward Iron Works
+    const x = w.x + side * w.rx * 0.82, z = w.z + w.rz * 0.1, y = heightAt(x, z);
+    B.add(GEO.box, '#6b5236', { x, y: y + 0.55, z, sx: 0.16, sy: 1.5, sz: 0.16 });
+  });
+}
+
+// Red octagon STOP sign on a metal post. Returns a small collider.
+export function addStopSign(B, scene, heightAt) {
+  const p = px(STOP_SIGN.x, STOP_SIGN.y), y = heightAt(p.x, p.z);
+  const top = 2.25;
+  B.add(GEO.cyl, '#9aa0a5', { x: p.x, y: y + top / 2 - 0.2, z: p.z, sx: 0.08, sy: top + 0.4, sz: 0.08 });
+  // gray back of the sign
+  const oct = new THREE.CylinderGeometry(0.4, 0.4, 0.03, 8);
+  oct.rotateY(Math.PI / 8);
+  oct.rotateX(Math.PI / 2);
+  B.add(oct, '#8d9296', { x: p.x, y: y + top, z: p.z - 0.06 });
+  // the face, toward the cars coming down the hill (north)
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const octPath = (r) => {
+    g.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = Math.PI / 8 + (i * Math.PI) / 4;
+      g.lineTo(128 + Math.cos(a) * r, 128 + Math.sin(a) * r);
+    }
+    g.closePath();
+  };
+  octPath(126); g.fillStyle = '#ffffff'; g.fill();
+  octPath(116); g.fillStyle = '#c8202a'; g.fill();
+  g.fillStyle = '#ffffff'; g.font = 'bold 74px Arial, Helvetica, sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('STOP', 128, 132);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.84, 0.84), litMat({ map: tex, alphaTest: 0.5, transparent: false }));
+  // canvas corners are transparent so only the octagon shows
+  face.position.set(p.x, y + top, p.z - 0.085);
+  face.rotation.y = Math.PI;
+  face.castShadow = true;
+  scene.add(face);
+  return { x: p.x, z: p.z, hw: 0.18, hd: 0.18, rot: 0 };
+}

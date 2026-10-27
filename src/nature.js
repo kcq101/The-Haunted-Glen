@@ -41,7 +41,7 @@ function offSidewalk(p, specs) {
   }
   // and off the driveways and front walks
   for (const s of specs) {
-    for (const seg of [s.driveway, s.walk]) {
+    for (const seg of [s.driveway, s.walk, s.walk2]) {
       if (!seg) continue;
       const pts = seg.mid ? [seg.a, seg.mid, seg.b] : [seg.a, seg.b];
       if (polylineDistance(x, z, pts).d < seg.width / 2 + 1.0) return null;

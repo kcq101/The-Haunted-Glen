@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { litMat } from './quality.js';
-import { ROADS, WOODS, CREEK, TRAIL, STORE, CUL_DE_SAC, px, MAP_SCALE } from './config.js';
+import { ROADS, WOODS, CREEK, TRAIL, STORE, CUL_DE_SAC, SWALES, px, MAP_SCALE } from './config.js';
 import { fbm, noise2, polylineDistance, pointInPolygon, smoothstep, lerp, chaikin, makeRng } from './util.js';
 
 // Terrain covers a little more than the playable area so the edges feel natural.
@@ -18,6 +18,17 @@ export const trailLine = chaikin(P(TRAIL), 3);
 export const woodsPolys = WOODS.map(P);
 export const culDeSac = { ...px(CUL_DE_SAC.x, CUL_DE_SAC.y), r: CUL_DE_SAC.r * MAP_SCALE, island: CUL_DE_SAC.island * MAP_SCALE };
 export const storePos = px(STORE.x, STORE.y);
+export const swales = SWALES.map((w) => ({ ...px(w.x, w.y), rx: w.rx * MAP_SCALE, rz: w.ry * MAP_SCALE }));
+// 0 outside a swale, 1 in the middle of one (smooth bowl shape)
+export function swaleAmount(x, z) {
+  let a = 0;
+  for (const w of swales) {
+    const e = Math.hypot((x - w.x) / w.rx, (z - w.z) / w.rz);
+    a = Math.max(a, 1 - smoothstep(0.25, 1.15, e));
+  }
+  return a;
+}
+const SWALE_DEPTH = 0.75;
 
 const northRoadZ = px(0, 525).z;
 const NORTH_RISE_CUT = 0.5; // 0 = real height, 0.5 = half as high above the street
@@ -150,6 +161,9 @@ export function createTerrain(pads, driveways, walkways) {
     const t = polylineDistance(x, z, trailLine);
     const wt = 1 - smoothstep(1.2, 3.5, t.d);
     if (wt > 0) h = lerp(h, natural(t.x, t.z), wt * 0.8);
+    // swales dip down into a shallow bowl
+    const sa = swaleAmount(x, z);
+    if (sa > 0) h -= SWALE_DEPTH * sa;
     return h;
   };
 
@@ -437,6 +451,20 @@ function paintGround(driveways, walkways) {
   strokeLine(ctx, creekLine, 5.2, '#5d4630');
   strokeLine(ctx, creekLine, 3.2, '#3f6f7a');
   strokeLine(ctx, creekLine, 1.6, '#5e98a3');
+
+  // 3b) Swales: damp, darker ground under the tall grasses
+  ctx.save();
+  ctx.filter = 'blur(3px)';
+  for (const w of swales) {
+    const [cx, cy] = toC(w);
+    for (const [k, col] of [[1.0, '#6f7f3c'], [0.78, '#6a6436'], [0.5, '#5a5530']]) {
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, w.rx * k * unitsToPx, w.rz * k * unitsToPx, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
 
   // 4) Trail and store clearing
   fillCircle(ctx, storePos, 13, '#8a7a4a');

@@ -113,6 +113,17 @@ export const CREEK = [[805, 575], [763, 605], [738, 670], [722, 730], [710, 800]
 export const TRAIL = [[714, 556], [708, 615], [694, 690], [682, 770], [684, 840], [700, 880], [720, 900], [733, 912]];
 export const STORE = { x: 752, y: 932, facing: -Math.PI * 0.75 }; // up on the east bank, door faces the trail
 
+// Vegetated swales (shallow basins of tall native grasses and shrubs) in the
+// open fields on each side of the bottom of Iron Works, set back behind the
+// sidewalk. rx/ry = half-size in aerial pixels.
+export const SWALES = [
+  { x: 146, y: 1245, rx: 20, ry: 42 }, // west field
+  { x: 262, y: 1250, rx: 20, ry: 42 }, // east field
+];
+// Stop sign on the right-hand side heading south, at the bottom of Iron Works
+// where it meets Crossover Blvd (faces the cars coming down the hill).
+export const STOP_SIGN = { x: 188, y: 1299 };
+
 // --- Houses ----------------------------------------------------------------
 // facing: direction the front door faces. 'S' = toward the bottom of the map.
 export const HOME_ID = 'h1018';

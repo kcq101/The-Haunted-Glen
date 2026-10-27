@@ -17,6 +17,10 @@ function toWorld(spec, lx, lz) {
   const c = Math.cos(spec.rot), s = Math.sin(spec.rot);
   return { x: spec.x + lx * c + lz * s, z: spec.z - lx * s + lz * c };
 }
+function toLocal(spec, p) {
+  const c = Math.cos(spec.rot), s = Math.sin(spec.rot), dx = p.x - spec.x, dz = p.z - spec.z;
+  return { x: dx * c - dz * s, z: dx * s + dz * c };
+}
 
 function nearestRoad(p, only) {
   let best = null;
@@ -103,12 +107,33 @@ export function makeHouseSpecs() {
       spec.driveway.a = toWorld(spec, spec.gx + spec.garageSide * (spec.gw / 2 + 2.2), -spec.D / 2);
       spec.driveway.mid = toWorld(spec, spec.gx + spec.garageSide * (spec.gw / 2 + 2.2), spec.D / 2 + 2);
     }
-    const doorPt = toWorld(spec, spec.doorX, spec.D / 2 + 0.6);
-    const roadDoor = nearestRoad(doorPt, h.sideLoad ? null : h.street); // side-load: the front walk still goes to the street it faces
-    const dx = doorPt.x - roadDoor.x, dz = doorPt.z - roadDoor.z;
-    const dl = Math.hypot(dx, dz) || 1;
-    const off = roadDoor.width / 2 + 2.6;
-    spec.walk = { a: doorPt, b: { x: roadDoor.x + (dx / dl) * off, z: roadDoor.z + (dz / dl) * off }, width: 1.5, color: spec.home ? '#9d9488' : '#aaa59c' };
+    // Front walk: from the foot of the front steps it runs along the front of
+    // the house (parallel to it) over to the driveway. No walks cut across the
+    // lawn to the street.
+    const zw = spec.D / 2 + 3.0;
+    const dw = spec.driveway;
+    const legs = dw.mid ? [[dw.mid, dw.b], [dw.a, dw.mid]] : [[dw.a, dw.b]];
+    let cross = null; // where the driveway's center line crosses the walk's line
+    for (const [p, q] of legs) {
+      const A = toLocal(spec, p), Q = toLocal(spec, q);
+      if ((A.z - zw) * (Q.z - zw) <= 0 && Math.abs(Q.z - A.z) > 1e-6) {
+        cross = A.x + ((zw - A.z) / (Q.z - A.z)) * (Q.x - A.x);
+        break;
+      }
+    }
+    const color = spec.home ? '#9d9488' : '#aaa59c';
+    const W = (lx, lz) => toWorld(spec, lx, lz);
+    if (cross !== null) {
+      const side = Math.sign(cross - spec.doorX) || 1;
+      spec.walk = { a: W(spec.doorX, zw), b: W(cross - side * (dw.width / 2 - 0.4), zw), width: 1.5, color };
+    } else {
+      // side-load garage: the driveway leaves from the side of the garage, so
+      // the walk runs along the front past the garage corner, then turns in
+      const A = toLocal(spec, dw.a), side = Math.sign(A.x - spec.doorX) || 1;
+      const ex = A.x + side * 1.6;
+      spec.walk = { a: W(spec.doorX, zw), b: W(ex, zw), width: 1.5, color };
+      spec.walk2 = { a: W(ex, zw + 0.75), b: W(ex, A.z + dw.width / 2 - 0.4), width: 1.5, color };
+    }
     return spec;
   });
 }
@@ -121,6 +146,7 @@ export function groundMarks(specs) {
       driveways.push({ a: s.driveway.mid, b: s.driveway.b, width: s.driveway.width });
     } else driveways.push(s.driveway);
     walkways.push(s.walk);
+    if (s.walk2) walkways.push(s.walk2);
   }
   return { driveways, walkways };
 }

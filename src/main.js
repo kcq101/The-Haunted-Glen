@@ -8,7 +8,7 @@ import { createTrees, createFallingLeaves } from './nature.js';
 import { createBackdrop } from './backdrop.js';
 import { GlowField } from './glow.js';
 import { DayNight, NIGHT_START } from './sky.js';
-import { decorateNeighborhood, addStreetLamps, addTrail, hauntHome, addBoundaryFence } from './decor.js';
+import { decorateNeighborhood, addStreetLamps, addTrail, hauntHome, addBoundaryFence, addSwales, addStopSign } from './decor.js';
 import { buildStoreExterior, HAZEL_LINES } from './store.js';
 import { buildStoreInterior } from './shopinside.js';
 import { Kid } from './character.js';
@@ -104,6 +104,8 @@ function buildWorld() {
   decorateNeighborhood(B, glows, specs, terrain.heightAt);
   addStreetLamps(B, glows, terrain.heightAt, [...marks.driveways, ...marks.walkways]);
   addBoundaryFence(B, terrain.heightAt);
+  addSwales(B, terrain.heightAt);
+  W.colliders.push(addStopSign(B, scene, terrain.heightAt));
   const trail = addTrail(B, glows, scene, terrain.heightAt);
   W.bridge = trail.bridge;
   const home = specs.find((s) => s.id === HOME_ID);
